@@ -1,0 +1,24 @@
+{
+  "name": "incentiv-dapp-sdk",
+  "version": "0.1.0",
+  "description": "Incentiv dApp SDK",
+  "main": "./dist/src/index.js",
+  "files": [
+    "dist/src",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "author": "Incentiv",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.15.24",
+    "typescript": "^5.8.3"
+  },
+  "peerDependencies": {
+    "ethers": "^5.0.0"
+  }
+}
