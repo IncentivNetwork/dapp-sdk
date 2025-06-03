@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { IncentivResolver, IncentivSigner } from 'incentiv-dapp-sdk';
+import { IncentivEnvironment, IncentivResolver, IncentivSigner } from 'incentiv-dapp-sdk';
 import { Modal, type ModalData } from './components/Modal';
 import { ethers } from 'ethers';
 import Config from './config';
 
 function App() {
-  const Environment = Config.Environments.Local;
+  const Environment = Config.Environments.Testnet;
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [userAddress, setUserAddress] = useState<string>('');
@@ -25,15 +25,19 @@ function App() {
 
     // Request account address from SDK
     IncentivResolver
-      .getAccountAddress(Environment.Portal).then((address) => {
+      .getAccountAddress(IncentivEnvironment.Testnet)
+      .then((address) => {
         setUserAddress(address);
         setIsConnecting(false);
 
+        // Create a regular ethers provider
         providerRef.current = new ethers.providers.StaticJsonRpcProvider(Environment.RPC);
+
+        // Create a signer that can sign transactions with the Incentiv portal
         signerRef.current = new IncentivSigner({
           address: address,
           provider: providerRef.current,
-          environment: Environment.Portal
+          environment: IncentivEnvironment.Testnet
         });
 
         handleFetchData();
