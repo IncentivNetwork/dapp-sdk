@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { IncentivEnvironment, IncentivResolver, IncentivSigner } from 'incentiv-dapp-sdk';
+import { IncentivEnvironment, IncentivResolver, IncentivSigner } from '@incentiv/dapp-sdk';
 import { Modal, type ModalData } from './components/Modal';
 import { ethers } from 'ethers';
 import Config from './config';

@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "incentiv-dapp-sdk": "file:..",
+    "@incentiv/dapp-sdk": "file:..",
     "ethers": "^5.8.0",
     "buffer": "^6.0.3",
     "react": "^19.1.0",
