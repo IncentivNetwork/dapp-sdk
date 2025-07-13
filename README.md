@@ -2,7 +2,7 @@
 
 > **JavaScript / TypeScript client that lets any web dApp send transactions through the Incentiv Portal.**
 
-[![NPM version](https://img.shields.io/npm/v/@incentiv/sdk)](https://www.npmjs.com/package/@incentiv/sdk)
+[![NPM version](https://img.shields.io/npm/v/@incentiv/dapp-sdk)](https://www.npmjs.com/package/@incentiv/dapp-sdk)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
 
 ---
@@ -31,9 +31,9 @@ The **Incentiv dApp SDK** solves this by:
 ## Installation
 
 ```bash
-npm install @incentiv/dapp-sdk ethers        # ethers v5 is required
+npm install @incentiv/dapp-sdk ethers@5.7.2        # ethers v5 is required
 # or
-yarn add @incentiv/dapp-sdk ethers
+yarn add @incentiv/dapp-sdk ethers@5.7.2
 ```
 
 > **ethers v5.x only** for now
@@ -50,32 +50,37 @@ import { ethers } from "ethers";
  * Choose which Incentiv environment you want to talk to
  */
 const Environment = {
-  Portal: "https://staging.incentiv.net",      // Incentiv Portal URL
-  RPC:    "https://rpc.staging.incentiv.net"   // JSON‑RPC endpoint
+  Portal:     "https://staging.incentiv.net",               // Incentiv Portal URL
+  RPC:        "https://rpc.staging.incentiv.net",           // JSON‑RPC endpoint
+  EntryPoint: "0xAc822ad1a236B0F2Afcc9c6b3873b864aBE1EdB9"  // EntryPoint contract
 };
 
 async function main () {
-  // 1️⃣  Ask the Portal to connect and give us the user’s address
+  // Ask the Portal to connect and give us the user’s address
   const address = await IncentivResolver.getAccountAddress(Environment.Portal);
 
-  // 2️⃣  Standard ethers provider
+  // Standard ethers provider
   const provider = new ethers.providers.StaticJsonRpcProvider(Environment.RPC);
 
-  // 3️⃣  Drop‑in signer – use it just like any ethers.Signer
+  // Drop‑in signer – use it just like any ethers.Signer
   const signer = new IncentivSigner({
     address,
     provider,
-    environment: Environment.Portal
+    environment: Environment.Portal,
+    entryPoint: Environment.EntryPoint
   });
 
-  // 4️⃣  Send a transaction – the Portal pop‑up will appear automatically
-  const userOpHash = await signer.sendTransaction({
+  // Send a transaction – the Portal pop‑up will appear automatically
+  const userOpReceipt = await signer.sendTransaction({
     to: "0xYourContract",
     data: "0x…",                                 // encoded calldata
     value: ethers.utils.parseEther("0.01")
   });
 
-  console.log("UserOperation hash:", userOpHash);
+  console.log("UserOperation hash:", userOpReceipt.hash);
+
+  // Wait for confirmation
+  await userOpReceipt.wait();
 }
 
 main().catch(console.error);

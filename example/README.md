@@ -31,8 +31,8 @@ A minimal **React + TypeScript** demo that shows how to integrate the [Incenti
 
 ```bash
 # 1. Clone the SDK repository (or copy only the /example folder)
-git clone https://github.com/incentiv-network/incentiv-dapp-sdk.git
-cd incentiv-dapp-sdk/example
+git clone https://github.com/IncentivNetwork/dapp-sdk.git
+cd dapp-sdk/example
 
 # 2. Install dependencies – the SDK is pulled from the parent folder via the "file:" reference in package.json
 npm install
