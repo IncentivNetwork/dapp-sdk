@@ -37,7 +37,8 @@ function App() {
         signerRef.current = new IncentivSigner({
           address: address,
           provider: providerRef.current,
-          environment: IncentivEnvironment.Testnet
+          environment: IncentivEnvironment.Testnet,
+          entryPoint: Environment.EntryPoint
         });
 
         handleFetchData();
@@ -80,7 +81,8 @@ function App() {
     );
 
     try {
-      await contract.setValue(newValue);
+      const tx = await contract.setValue(newValue);
+      await tx.wait();
       setNewValue('');
       setModalData({
         title: 'Transaction Sent!',

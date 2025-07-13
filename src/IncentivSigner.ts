@@ -1,17 +1,22 @@
 import { BigNumber, ethers } from "ethers";
 import { IncentivEnvironment, IncentivResolver } from "./IncentivResolver";
-import { TransactionRequest, TransactionResponse } from "@ethersproject/abstract-provider";
+import { TransactionReceipt, TransactionRequest, TransactionResponse } from "@ethersproject/abstract-provider";
+import { UserOperationEventListener } from "./UserOperationEventListener";
+import { EntryPoint__factory } from "./contracts/EntryPoint__factory";
+import { EntryPoint } from "./contracts/EntryPoint";
 
 export type IncentivSignerOptions = {
-    address?: string;
-    provider?: ethers.providers.Provider;
-    environment?: IncentivEnvironment | string;
+    entryPoint: string;
+    address: string;
+    provider: ethers.providers.Provider;
+    environment: IncentivEnvironment | string;
 }
 
 class IncentivSigner extends ethers.Signer {
     public incentivResolver: IncentivResolver;
-    public provider?: ethers.providers.Provider;
-    public address?: string;
+    public provider: ethers.providers.Provider;
+    public address: string;
+    public entryPoint: EntryPoint;
 
     constructor(options: IncentivSignerOptions) {
         super();
@@ -20,6 +25,10 @@ class IncentivSigner extends ethers.Signer {
         this.incentivResolver = new IncentivResolver(
             options.environment ?? IncentivEnvironment.Mainnet
         );
+        this.entryPoint = EntryPoint__factory.connect(
+            options.entryPoint, 
+            options.provider
+        )
     }
 
     getAddress(): Promise<string> {
@@ -54,7 +63,20 @@ class IncentivSigner extends ethers.Signer {
             data: transaction.data?.toString() ?? "",
             value: BigNumber.from(transaction.value ?? 0),
             chainId: transaction.chainId ?? 0,
-            wait: async () => { throw new Error("Method not supported."); },
+            wait: async (timeout: number = 60000) => { 
+                return await new Promise<TransactionReceipt>((resolve, reject) => {
+                    const listener = new UserOperationEventListener(
+                        resolve, 
+                        reject, 
+                        this.entryPoint, 
+                        this.address, 
+                        hash, 
+                        undefined, 
+                        timeout
+                    )
+                    listener.start()
+                })
+            },
         };
     }
 
@@ -73,6 +95,7 @@ class IncentivSigner extends ethers.Signer {
             address: this.address,
             provider: provider,
             environment: this.incentivResolver.getPortalUrl(),
+            entryPoint: this.entryPoint.address,
         });
     }
 }

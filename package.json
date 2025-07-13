@@ -1,6 +1,6 @@
 {
   "name": "incentiv-dapp-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Incentiv dApp SDK",
   "main": "./dist/src/index.js",
   "files": [
@@ -9,7 +9,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepare": "npm run build"
   },
   "author": "Incentiv",
   "license": "MIT",
