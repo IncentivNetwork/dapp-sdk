@@ -1,6 +1,6 @@
-import { base64 } from "ethers/lib/utils";
 import { TransactionRequest } from "@ethersproject/abstract-provider";
-import { ethers } from "ethers";
+import { hexlify } from "ethers/lib/utils";
+import base64url from "base64url";
 
 export enum IncentivEnvironment {
     Staging = "https://staging.incentiv.net",
@@ -25,8 +25,7 @@ export class IncentivResolver {
         }
 
         return new Promise((resolve, reject) => {
-            const dataBytes = ethers.utils.toUtf8Bytes(JSON.stringify({ intent: "CONNECT" }));
-            const data = base64.encode(dataBytes);
+            const data = base64url.encode(JSON.stringify({ intent: "CONNECT" }));
             const popup = window.open(`${environment}/dapp?data=${data}`, "Popup", 'width=700,height=500');
             const timerRef = setInterval(() => {
                 if(popup?.closed) {
@@ -68,9 +67,11 @@ export class IncentivResolver {
                 maxFeePerGas: transaction.maxFeePerGas?.toString(),
             }
             
-            const dataBytes = ethers.utils.toUtf8Bytes(JSON.stringify(dataObject));
-            const encodedData = base64.encode(dataBytes);
-            const encodedCalldata = base64.encode(transaction.data ?? "")
+            const encodedData = base64url.encode(JSON.stringify(dataObject));
+
+            let hexCalldata = transaction.data ? hexlify(transaction.data) : "";
+            hexCalldata = hexCalldata.startsWith("0x") ? hexCalldata.slice(2) : hexCalldata;
+            const encodedCalldata = base64url.encode(hexCalldata, 'hex')
 
             const popup = window.open(`${this._portalUrl}/dapp?data=${encodedData}&calldata=${encodedCalldata}`, "Popup", 'width=700,height=700');
             const timerRef = setInterval(() => {

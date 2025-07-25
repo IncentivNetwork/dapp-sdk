@@ -1,6 +1,6 @@
 {
   "name": "@incentiv/dapp-sdk",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Incentiv dApp SDK",
   "main": "./dist/src/index.js",
   "files": [
@@ -18,7 +18,9 @@
   },
   "author": "Incentiv",
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "base64url": "^3.0.1"
+  },
   "devDependencies": {
     "@types/node": "^22.15.24",
     "typescript": "^5.8.3"
