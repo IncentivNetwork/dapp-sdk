@@ -8,6 +8,20 @@ export enum IncentivEnvironment {
     Mainnet = "https://incentiv.net"
 }
 
+export interface BatchRequestOptions {
+    from: string,
+    gasLimit?: string,
+    gasPrice?: string,
+    maxPriorityFeePerGas?: string,
+    maxFeePerGas?: string,
+}
+
+export interface BatchCall {
+    to: string,
+    value?: string,
+    data?: string,
+}
+
 export class IncentivResolver {
     private _portalUrl: string;
 
@@ -90,6 +104,51 @@ export class IncentivResolver {
                     resolve(hash);
                 }
                 else if (type === 'CALL_FAILED') {
+                    clearInterval(timerRef);
+                    reject(new Error("Call failed"));
+                }
+                else if (type === 'REJECTED') {
+                    clearInterval(timerRef);
+                    reject(new Error("User rejected call"));
+                }
+            });
+        });
+    }
+
+    async sendBatchTransaction(calls: BatchCall[], options: BatchRequestOptions): Promise<string> {
+        if(!window) {
+            throw new Error("IncentivResolver must be used in a browser environment");
+        }
+
+        return new Promise((resolve, reject) => {
+            const dataObject = {
+                intent: "BATCH",
+                calls: calls,
+                from: options.from,
+                gasLimit: options.gasLimit?.toString(),
+                gasPrice: options.gasPrice?.toString(),
+                maxPriorityFeePerGas: options.maxPriorityFeePerGas?.toString(),
+                maxFeePerGas: options.maxFeePerGas?.toString(),
+            }
+
+            const encodedData = base64url.encode(JSON.stringify(dataObject));
+            const popup = window.open(`${this._portalUrl}/dapp?data=${encodedData}`, "Popup", 'width=700,height=700');
+            const timerRef = setInterval(() => {
+                if(popup?.closed) {
+                    clearInterval(timerRef);
+                    reject(new Error("Popup closed"));
+                }
+            }, 500);
+            
+            window.addEventListener('message', (event) => {
+                if (event.origin !== this._portalUrl) return;
+                
+                const { type, hash } = event.data || {};
+                if (type === 'BATCH_EXECUTED') {
+                    clearInterval(timerRef);
+                    resolve(hash);
+                }
+                else if (type === 'BATCH_FAILED') {
                     clearInterval(timerRef);
                     reject(new Error("Call failed"));
                 }

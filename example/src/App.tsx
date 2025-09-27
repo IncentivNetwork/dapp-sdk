@@ -17,7 +17,7 @@ function App() {
   const [modalData, setModalData] = useState<ModalData | null>(null);
 
   const providerRef = useRef<ethers.providers.Provider | null>(null);
-  const signerRef = useRef<ethers.Signer | null>(null);
+  const signerRef = useRef<IncentivSigner | null>(null);
 
   const handleConnect = async () => {
     setIsConnecting(true);

@@ -106,25 +106,47 @@ main().catch(console.error);
 
 ### `class IncentivResolver`
 
-| Method                                    | Description                                                                                                                      |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `static getAccountAddress(environment)`   | Opens the Portal pop‑up with intent `CONNECT`. Resolves with the user’s account address.                                         |
-| `constructor(environment)`                | Creates a resolver bound to a specific Portal URL.                                                                               |
-| `sendTransaction(tx: TransactionRequest)` | Opens the Portal pop‑up with intent `CALL`, waits for the signature & submission, then resolves with the **UserOperation hash**. |
-| `getPortalUrl()`                          | Returns the Portal URL the resolver is bound to.                                                                                 |
+| Method                                                  | Description                                                                                                                      |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `static getAccountAddress(environment)`                 | Opens the Portal pop‑up with intent `CONNECT`. Resolves with the user's account address.                                         |
+| `constructor(environment)`                              | Creates a resolver bound to a specific Portal URL.                                                                               |
+| `sendTransaction(tx: TransactionRequest)`               | Opens the Portal pop‑up with intent `CALL`, waits for the signature & submission, then resolves with the **UserOperation hash**. |
+| `sendBatchTransaction(calls: BatchCall[], options: BatchRequestOptions)` | Opens the Portal pop‑up with intent `BATCH`, executes multiple calls in a single UserOperation, then resolves with the **UserOperation hash**. |
+| `getPortalUrl()`                                        | Returns the Portal URL the resolver is bound to.                                                                                 |
 
 ---
 
 ### `class IncentivSigner extends ethers.Signer`
 
-| Method                       | Notes                                                                                                                                     |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `getAccountAddress()`        | Same as the static resolver call but also stores the address internally.                                                                  |
-| `sendTransaction(tx)`        | Returns a `TransactionResponse`‑like object whose `.hash` is the **UserOperation hash**. The `.wait()` method is **not implemented yet**. |
-| `connect(provider)`          | Returns a new signer instance bound to the given provider.                                                                                |
-| `setAccountAddress(address)` | Manually set / override the account address.                                                                                              |
+| Method                                                  | Notes                                                                                                                                     |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `getAccountAddress()`                                   | Same as the static resolver call but also stores the address internally.                                                                  |
+| `sendTransaction(tx)`                                   | Returns a `TransactionResponse`‑like object whose `.hash` is the **UserOperation hash**. The `.wait()` method is **not implemented yet**. |
+| `sendBatchTransaction(calls: BatchCall[], options: BatchRequestOptions)` | Returns a `TransactionResponse`‑like object for batch transactions. Executes multiple calls in a single UserOperation with full `.wait()` support. |
+| `connect(provider)`                                     | Returns a new signer instance bound to the given provider.                                                                                |
+| `setAccountAddress(address)`                            | Manually set / override the account address.                                                                                              |
 
 > `signMessage` and `signTransaction` are intentionally **unsupported** – signing happens inside the Portal UI.
+
+---
+
+### Batch Transaction Types
+
+```ts
+interface BatchCall {
+  to: string;        // Target contract address
+  value?: string;    // Value to send (optional)
+  data?: string;     // Encoded calldata (optional)
+}
+
+interface BatchRequestOptions {
+  from: string;                    // Sender address
+  gasLimit?: string;               // Gas limit (optional)
+  gasPrice?: string;               // Gas price (optional)
+  maxPriorityFeePerGas?: string;   // EIP-1559 priority fee (optional)
+  maxFeePerGas?: string;           // EIP-1559 max fee (optional)
+}
+```
 
 ---
 

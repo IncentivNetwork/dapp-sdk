@@ -1,5 +1,5 @@
 import { BigNumber, ethers } from "ethers";
-import { IncentivEnvironment, IncentivResolver } from "./IncentivResolver";
+import { BatchCall, BatchRequestOptions, IncentivEnvironment, IncentivResolver } from "./IncentivResolver";
 import { TransactionReceipt, TransactionRequest, TransactionResponse } from "@ethersproject/abstract-provider";
 import { UserOperationEventListener } from "./UserOperationEventListener";
 import { EntryPoint__factory } from "./contracts/EntryPoint__factory";
@@ -63,6 +63,34 @@ class IncentivSigner extends ethers.Signer {
             data: transaction.data?.toString() ?? "",
             value: BigNumber.from(transaction.value ?? 0),
             chainId: transaction.chainId ?? 0,
+            wait: async (timeout: number = 60000) => { 
+                return await new Promise<TransactionReceipt>((resolve, reject) => {
+                    const listener = new UserOperationEventListener(
+                        resolve, 
+                        reject, 
+                        this.entryPoint, 
+                        this.address, 
+                        hash, 
+                        undefined, 
+                        timeout
+                    )
+                    listener.start()
+                })
+            },
+        };
+    }
+
+    async sendBatchTransaction(calls: BatchCall[], options: BatchRequestOptions): Promise<TransactionResponse> {
+        const hash = await this.incentivResolver.sendBatchTransaction(calls, options);
+        return {
+            hash: hash,
+            confirmations: 0,
+            from: options.from ?? "",
+            nonce: Number(0),
+            gasLimit: BigNumber.from(options.gasLimit ?? 0),
+            data: "",
+            value: BigNumber.from(0),
+            chainId: 0,
             wait: async (timeout: number = 60000) => { 
                 return await new Promise<TransactionReceipt>((resolve, reject) => {
                     const listener = new UserOperationEventListener(
