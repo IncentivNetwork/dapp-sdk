@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { IncentivEnvironment, IncentivResolver, IncentivSigner } from '@incentiv/dapp-sdk';
+import { IncentivResolver, IncentivSigner } from '@incentiv/dapp-sdk';
 import { Modal, type ModalData } from './components/Modal';
 import { ethers } from 'ethers';
 import Config from './config';
 
 function App() {
-  const Environment = Config.Environments.Testnet;
+  // Specify the environment to use
+  const Environment = Config.Environments.Mainnet;
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [userAddress, setUserAddress] = useState<string>('');
@@ -25,7 +26,7 @@ function App() {
 
     // Request account address from SDK
     IncentivResolver
-      .getAccountAddress(IncentivEnvironment.Testnet)
+      .getAccountAddress(Environment.Portal)
       .then((address) => {
         setUserAddress(address);
         setIsConnecting(false);
@@ -37,7 +38,7 @@ function App() {
         signerRef.current = new IncentivSigner({
           address: address,
           provider: providerRef.current,
-          environment: IncentivEnvironment.Testnet,
+          environment: Environment.Portal,
           entryPoint: Environment.EntryPoint
         });
 

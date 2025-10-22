@@ -1,6 +1,6 @@
 {
   "name": "@incentiv/dapp-sdk",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Incentiv dApp SDK",
   "main": "./dist/src/index.js",
   "files": [

@@ -3,9 +3,8 @@ import { hexlify } from "ethers/lib/utils";
 import base64url from "base64url";
 
 export enum IncentivEnvironment {
-    Staging = "https://staging.incentiv.net",
-    Testnet = "https://testnet.incentiv.net",
-    Mainnet = "https://incentiv.net"
+    Testnet = "https://testnet.incentiv.io",
+    Mainnet = "https://portal.incentiv.io"
 }
 
 export interface BatchRequestOptions {

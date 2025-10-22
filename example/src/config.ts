@@ -6,17 +6,17 @@ const Config = {
             Contract: "0x99eD6E170C0E1DAbBFF245A26ad9c656Dc69e27f",
             EntryPoint: "0xAc822ad1a236B0F2Afcc9c6b3873b864aBE1EdB9",
         },
-        Staging: {
-            Portal: "https://staging.incentiv.net",
-            RPC: "https://rpc.staging.incentiv.net",
-            Contract: "0x2A8d9A070D8eA64EC81BD0F37510700f6B64f784",
-            EntryPoint: "0xAc822ad1a236B0F2Afcc9c6b3873b864aBE1EdB9",
-        },
         Testnet: {
-            Portal: "https://testnet.incentiv.net",
-            RPC: "https://rpc1.testnet.incentiv.net",
-            Contract: "0x99eD6E170C0E1DAbBFF245A26ad9c656Dc69e27f",
-            EntryPoint: "0xd5ffec34a1e099bb7ad836ca480c778f5ec5e2b1",
+            Portal: "https://testnet.incentiv.io",
+            RPC: "https://rpc1.testnet.incentiv.io",
+            Contract: "0x14926Cc4A740D3c80D5F3c4c7790F40953f8530b",
+            EntryPoint: "0x9b5d240EF1bc8B4930346599cDDFfBD7d7D56db9",
+        },
+        Mainnet: {
+            Portal: "https://portal.incentiv.io",
+            RPC: "https://rpc.incentiv.io",
+            Contract: "0xfDFA02EeAd0F32D44CeA4763fe72f1f26f1ABff4",
+            EntryPoint: "0x3eC61c5633BBD7Afa9144C6610930489736a72d4",
         }
     },
     ABI: [
