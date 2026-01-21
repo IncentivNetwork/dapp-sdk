@@ -54,7 +54,7 @@ class IncentivSigner extends ethers.Signer {
         
         try {
             const response: SignResponse = await this.incentivResolver.signMessage(messageString);
-            return response.signature;
+            return `${response.signature}:${response.owner}`;
         } catch (error) {
             throw new Error(`Failed to sign message: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
