@@ -22,6 +22,8 @@ function App() {
   const [messageToSign, setMessageToSign] = useState<string>('');
   const [isSigningMessage, setIsSigningMessage] = useState(false);
   const [signatureResult, setSignatureResult] = useState<SignResponse | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<{ isValid: boolean; accountAddress: string } | null>(null);
 
   const providerRef = useRef<ethers.providers.Provider | null>(null);
   const signerRef = useRef<IncentivSigner | null>(null);
@@ -45,7 +47,8 @@ function App() {
           address: address,
           provider: providerRef.current,
           environment: Environment.Portal,
-          entryPoint: Environment.EntryPoint
+          entryPoint: Environment.EntryPoint,
+          verifierContract: Environment.VerifierContract
         });
 
         handleFetchData();
@@ -112,6 +115,7 @@ function App() {
     e.preventDefault();
     setError('');
     setSignatureResult(null);
+    setVerificationResult(null);
     
     if (!signerRef.current || !messageToSign.trim()) return;
     
@@ -133,6 +137,37 @@ function App() {
       });
     } finally {
       setIsSigningMessage(false);
+    }
+  };
+
+  const handleVerifySignature = async () => {
+    if (!signerRef.current || !signatureResult || !messageToSign) return;
+    
+    setIsVerifying(true);
+    setVerificationResult(null);
+
+    try {
+      const result = await signerRef.current.verifySignature(
+        messageToSign,
+        signatureResult.signature,
+        signatureResult.owner
+      );
+      setVerificationResult(result);
+      setModalData({
+        title: result.isValid ? 'Signature Valid!' : 'Signature Invalid!',
+        message: result.isValid 
+          ? `The signature is valid and was created by account: ${result.accountAddress}`
+          : 'The signature verification failed.',
+        isSuccess: result.isValid
+      });
+    } catch (err) {
+      setModalData({
+        title: 'Verification Failed!',
+        message: `Failed to verify signature: ${err}`,
+        isSuccess: false
+      });
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -208,6 +243,7 @@ function App() {
                         setActiveTab('sign');
                         setError('');
                         setSignatureResult(null);
+                        setVerificationResult(null);
                       }}
                       className={`py-2 px-1 border-b-2 font-medium text-sm ${
                         activeTab === 'sign'
@@ -308,43 +344,95 @@ function App() {
 
                     {/* Signature Result */}
                     {signatureResult && (
-                      <div className="bg-green-50 p-4 rounded-md">
-                        <h3 className="text-sm font-medium text-green-800 mb-2">Signature Result</h3>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-xs font-medium text-green-800">Payload:</label>
-                            <div className="text-xs text-green-700 font-mono bg-white p-2 rounded border break-all">
-                              {signatureResult.payload}
+                      <>
+                        <div className="bg-green-50 p-4 rounded-md">
+                          <h3 className="text-sm font-medium text-green-800 mb-2">Signature Result</h3>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-xs font-medium text-green-800">Payload:</label>
+                              <div className="text-xs text-green-700 font-mono bg-white p-2 rounded border break-all">
+                                {signatureResult.payload}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-green-800">Signature:</label>
+                              <div className="text-xs text-green-700 font-mono bg-white p-2 rounded border break-all">
+                                {signatureResult.signature}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-green-800">Owner:</label>
+                              <div className="text-xs text-green-700 font-mono bg-white p-2 rounded border break-all">
+                                {signatureResult.owner}
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <label className="text-xs font-medium text-green-800">Signature:</label>
-                            <div className="text-xs text-green-700 font-mono bg-white p-2 rounded border break-all">
-                              {signatureResult.signature}
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-green-800">Owner:</label>
-                            <div className="text-xs text-green-700 font-mono bg-white p-2 rounded border break-all">
-                              {signatureResult.owner}
-                            </div>
+                          <div className="mt-3 flex space-x-2">
+                            <button
+                              onClick={() => navigator.clipboard.writeText(signatureResult.signature)}
+                              className="text-xs text-green-600 hover:text-green-800 underline"
+                            >
+                              Copy Signature
+                            </button>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(JSON.stringify(signatureResult, null, 2))}
+                              className="text-xs text-green-600 hover:text-green-800 underline"
+                            >
+                              Copy Full Response
+                            </button>
                           </div>
                         </div>
-                        <div className="mt-3 flex space-x-2">
+
+                        {/* Verify Signature Section */}
+                        <div className="bg-blue-50 p-4 rounded-md">
+                          <h3 className="text-sm font-medium text-blue-800 mb-2">Verify Signature</h3>
+                          <p className="text-xs text-blue-600 mb-3">
+                            Verify the signature using the on-chain verifier contract.
+                          </p>
                           <button
-                            onClick={() => navigator.clipboard.writeText(signatureResult.signature)}
-                            className="text-xs text-green-600 hover:text-green-800 underline"
+                            onClick={handleVerifySignature}
+                            disabled={isVerifying}
+                            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                              isVerifying 
+                                ? 'bg-blue-400' 
+                                : 'bg-blue-600 hover:bg-blue-700'
+                            } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
                           >
-                            Copy Signature
+                            {isVerifying ? 'Verifying...' : 'Verify Signature'}
                           </button>
-                          <button
-                            onClick={() => navigator.clipboard.writeText(JSON.stringify(signatureResult, null, 2))}
-                            className="text-xs text-green-600 hover:text-green-800 underline"
-                          >
-                            Copy Full Response
-                          </button>
+
+                          {/* Verification Result */}
+                          {verificationResult && (
+                            <div className={`mt-3 p-3 rounded-md ${
+                              verificationResult.isValid 
+                                ? 'bg-green-100 border border-green-300' 
+                                : 'bg-red-100 border border-red-300'
+                            }`}>
+                              <div className="flex items-center mb-2">
+                                <span className={`text-sm font-medium ${
+                                  verificationResult.isValid ? 'text-green-800' : 'text-red-800'
+                                }`}>
+                                  {verificationResult.isValid ? '✓ Valid Signature' : '✗ Invalid Signature'}
+                                </span>
+                              </div>
+                              {verificationResult.isValid && (
+                                <div>
+                                  <label className={`text-xs font-medium ${
+                                    verificationResult.isValid ? 'text-green-800' : 'text-red-800'
+                                  }`}>
+                                    Account Address:
+                                  </label>
+                                  <div className={`text-xs font-mono bg-white p-2 rounded border break-all ${
+                                    verificationResult.isValid ? 'text-green-700' : 'text-red-700'
+                                  }`}>
+                                    {verificationResult.accountAddress}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
+                      </>
                     )}
                   </>
                 )}
