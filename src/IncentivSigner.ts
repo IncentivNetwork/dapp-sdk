@@ -4,12 +4,14 @@ import { TransactionReceipt, TransactionRequest, TransactionResponse } from "@et
 import { UserOperationEventListener } from "./UserOperationEventListener";
 import { EntryPoint__factory } from "./contracts/EntryPoint__factory";
 import { EntryPoint } from "./contracts/EntryPoint";
+import SignatureVerifierABI from "./abi/SignatureVerifierABI";
 
 export type IncentivSignerOptions = {
     entryPoint: string;
     address: string;
     provider: ethers.providers.Provider;
     environment: IncentivEnvironment | string;
+    verifierContract: string;
 }
 
 class IncentivSigner extends ethers.Signer {
@@ -17,6 +19,7 @@ class IncentivSigner extends ethers.Signer {
     public provider: ethers.providers.Provider;
     public address: string;
     public entryPoint: EntryPoint;
+    public verifierContract: ethers.Contract;
 
     constructor(options: IncentivSignerOptions) {
         super();
@@ -28,7 +31,12 @@ class IncentivSigner extends ethers.Signer {
         this.entryPoint = EntryPoint__factory.connect(
             options.entryPoint, 
             options.provider
-        )
+        );
+        this.verifierContract = new ethers.Contract(
+            options.verifierContract,
+            SignatureVerifierABI,
+            options.provider
+        );
     }
 
     getAddress(): Promise<string> {
@@ -134,6 +142,39 @@ class IncentivSigner extends ethers.Signer {
         this.address = address;
     }
 
+    async verifySignature(
+        message: ethers.Bytes | string,
+        signature: string,
+        owner: string
+    ): Promise<{ isValid: boolean; accountAddress: string }> {
+        try {
+            // Convert message to bytes if it's a string
+            const messageBytes = typeof message === 'string' 
+                ? ethers.utils.toUtf8Bytes(message) 
+                : message;
+            
+            // Owner is always a hex string, convert to bytes
+            const ownerBytes = ethers.utils.arrayify(owner);
+            
+            // Signature is a hex string, convert to bytes
+            const signatureBytes = ethers.utils.arrayify(signature);
+
+            // Call the verifier contract
+            const result = await this.verifierContract.callStatic.verifySignature(
+                ownerBytes,
+                messageBytes,
+                signatureBytes
+            );
+
+            return {
+                isValid: result.isValid,
+                accountAddress: result.accountAddress
+            };
+        } catch (error) {
+            throw new Error(`Failed to verify signature: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
     connect(provider: ethers.providers.Provider): ethers.Signer {
         if (!this.address) {
             throw new Error("Account address not set.");
@@ -143,6 +184,7 @@ class IncentivSigner extends ethers.Signer {
             provider: provider,
             environment: this.incentivResolver.getPortalUrl(),
             entryPoint: this.entryPoint.address,
+            verifierContract: this.verifierContract.address,
         });
     }
 }
