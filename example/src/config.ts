@@ -13,7 +13,7 @@ const Config = {
             EntryPoint: "0x9b5d240EF1bc8B4930346599cDDFfBD7d7D56db9",
         },
         Mainnet: {
-            Portal: "https://portal.incentiv.io",
+            Portal: "https://mainnet.incentiv.io",
             RPC: "https://rpc.incentiv.io",
             Contract: "0xfDFA02EeAd0F32D44CeA4763fe72f1f26f1ABff4",
             EntryPoint: "0x3eC61c5633BBD7Afa9144C6610930489736a72d4",
