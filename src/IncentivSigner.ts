@@ -11,7 +11,7 @@ export type IncentivSignerOptions = {
     address: string;
     provider: ethers.providers.Provider;
     environment: IncentivEnvironment | string;
-    verifierContract: string;
+    verifierContract?: string;
 }
 
 class IncentivSigner extends ethers.Signer {
@@ -19,7 +19,7 @@ class IncentivSigner extends ethers.Signer {
     public provider: ethers.providers.Provider;
     public address: string;
     public entryPoint: EntryPoint;
-    public verifierContract: ethers.Contract;
+    public verifierContract?: ethers.Contract;
 
     constructor(options: IncentivSignerOptions) {
         super();
@@ -32,11 +32,13 @@ class IncentivSigner extends ethers.Signer {
             options.entryPoint, 
             options.provider
         );
-        this.verifierContract = new ethers.Contract(
-            options.verifierContract,
-            SignatureVerifierABI,
-            options.provider
-        );
+        if (options.verifierContract) {
+            this.verifierContract = new ethers.Contract(
+                options.verifierContract,
+                SignatureVerifierABI,
+                options.provider
+            );
+        }
     }
 
     getAddress(): Promise<string> {
@@ -147,6 +149,12 @@ class IncentivSigner extends ethers.Signer {
         signature: string,
         owner: string
     ): Promise<{ isValid: boolean; accountAddress: string }> {
+        if (!this.verifierContract) {
+            throw new Error(
+                'Signature verification is not available. Please provide a verifierContract address when initializing IncentivSigner.'
+            );
+        }
+
         try {
             // Convert message to bytes if it's a string
             const messageBytes = typeof message === 'string' 
@@ -184,7 +192,7 @@ class IncentivSigner extends ethers.Signer {
             provider: provider,
             environment: this.incentivResolver.getPortalUrl(),
             entryPoint: this.entryPoint.address,
-            verifierContract: this.verifierContract.address,
+            verifierContract: this.verifierContract?.address,
         });
     }
 }
