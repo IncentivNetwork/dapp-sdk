@@ -1,5 +1,5 @@
 import { BigNumber, ethers } from "ethers";
-import { BatchCall, BatchRequestOptions, IncentivEnvironment, IncentivResolver } from "./IncentivResolver";
+import { BatchCall, BatchRequestOptions, IncentivEnvironment, IncentivResolver, SignResponse } from "./IncentivResolver";
 import { TransactionReceipt, TransactionRequest, TransactionResponse } from "@ethersproject/abstract-provider";
 import { UserOperationEventListener } from "./UserOperationEventListener";
 import { EntryPoint__factory } from "./contracts/EntryPoint__factory";
@@ -38,8 +38,27 @@ class IncentivSigner extends ethers.Signer {
         return Promise.resolve(this.address);
     }
 
-    signMessage(message: ethers.Bytes | string): Promise<string> {
-        throw new Error("Method not supported.");
+    async signMessage(message: ethers.Bytes | string): Promise<string> {
+        // Convert bytes to string if needed
+        const messageString = typeof message === 'string' ? message : ethers.utils.toUtf8String(message);
+        
+        try {
+            const response: SignResponse = await this.incentivResolver.signMessage(messageString);
+            return response.signature;
+        } catch (error) {
+            throw new Error(`Failed to sign message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    async signMessageDetailed(message: ethers.Bytes | string): Promise<SignResponse> {
+        // Convert bytes to string if needed
+        const messageString = typeof message === 'string' ? message : ethers.utils.toUtf8String(message);
+        
+        try {
+            return await this.incentivResolver.signMessage(messageString);
+        } catch (error) {
+            throw new Error(`Failed to sign message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
 
     signTransaction(transaction: TransactionRequest): Promise<string> {

@@ -1,2 +1,2 @@
 export { default as IncentivSigner } from "./IncentivSigner";
-export { IncentivResolver, IncentivEnvironment } from "./IncentivResolver";
+export { IncentivResolver, IncentivEnvironment, SignResponse, BatchCall, BatchRequestOptions } from "./IncentivResolver";

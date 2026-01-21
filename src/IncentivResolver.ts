@@ -21,6 +21,12 @@ export interface BatchCall {
     data?: string,
 }
 
+export interface SignResponse {
+    payload: string;
+    signature: string;
+    owner: string;
+}
+
 export class IncentivResolver {
     private _portalUrl: string;
 
@@ -154,6 +160,55 @@ export class IncentivResolver {
                 else if (type === 'REJECTED') {
                     clearInterval(timerRef);
                     reject(new Error("User rejected call"));
+                }
+            });
+        });
+    }
+
+    async signMessage(message: string): Promise<SignResponse> {
+        if(!window) {
+            throw new Error("IncentivResolver must be used in a browser environment");
+        }
+
+        return new Promise((resolve, reject) => {
+            const dataObject = {
+                intent: "SIGN",
+                payload: message
+            };
+            
+            const encodedData = base64url.encode(JSON.stringify(dataObject));
+            const popup = window.open(`${this._portalUrl}/dapp?data=${encodedData}`, "Popup", 'width=700,height=700');
+            
+            const timerRef = setInterval(() => {
+                if(popup?.closed) {
+                    clearInterval(timerRef);
+                    reject(new Error("Popup closed"));
+                }
+            }, 500);
+            
+            window.addEventListener('message', (event) => {
+                if (event.origin !== this._portalUrl) return;
+                
+                const { type, payload, signature, owner, reason } = event.data || {};
+                
+                if (type === 'SIGN_RESOLVED') {
+                    clearInterval(timerRef);
+                    popup?.close();
+                    resolve({
+                        payload,
+                        signature,
+                        owner
+                    });
+                }
+                else if (type === 'SIGN_FAILED') {
+                    clearInterval(timerRef);
+                    popup?.close();
+                    reject(new Error(`Sign failed: ${reason}`));
+                }
+                else if (type === 'REJECTED') {
+                    clearInterval(timerRef);
+                    popup?.close();
+                    reject(new Error(`User rejected signature request: ${reason}`));
                 }
             });
         });
