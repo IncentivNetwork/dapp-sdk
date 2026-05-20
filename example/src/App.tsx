@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { IncentivResolver, IncentivSigner, type SignResponse } from '@incentiv/dapp-sdk';
 import { Modal, type ModalData } from './components/Modal';
-import { ethers } from 'ethers';
+import { Contract, Interface, JsonRpcProvider, isAddress, type Provider } from 'ethers';
 import Config from './config';
 
 function App() {
@@ -25,8 +25,9 @@ function App() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{ isValid: boolean; accountAddress: string } | null>(null);
 
-  const providerRef = useRef<ethers.providers.Provider | null>(null);
+  const providerRef = useRef<Provider | null>(null);
   const signerRef = useRef<IncentivSigner | null>(null);
+  const contractInterface = useRef(new Interface(Config.ABI));
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -39,8 +40,11 @@ function App() {
         setUserAddress(address);
         setIsConnecting(false);
 
-        // Create a regular ethers provider
-        providerRef.current = new ethers.providers.StaticJsonRpcProvider(Environment.RPC);
+        // Create a regular ethers provider. `staticNetwork: true` matches v5's
+        // StaticJsonRpcProvider behavior (skip per-request chainId checks).
+        providerRef.current = new JsonRpcProvider(Environment.RPC, undefined, {
+          staticNetwork: true,
+        });
 
         // Create a signer that can sign transactions with the Incentiv portal
         signerRef.current = new IncentivSigner({
@@ -60,12 +64,13 @@ function App() {
   };
 
   const handleFetchData = async () => {
-    if (!signerRef.current) return;
+    if (!providerRef.current) return;
 
-    const contract = new ethers.Contract(
+    // Reads go through the regular provider — IncentivSigner is for write paths only.
+    const contract = new Contract(
       Environment.Contract,
       Config.ABI,
-      signerRef.current
+      providerRef.current
     );
 
     const value = await contract.storedValue();
@@ -84,14 +89,16 @@ function App() {
     setIsLoading(true);
 
     // Send transaction! This will request a popup to be opened in the Incentiv portal.
-    const contract = new ethers.Contract(
-      Environment.Contract,
-      Config.ABI,
-      signerRef.current
-    );
+    // As of dapp-sdk 0.2.0, IncentivSigner is no longer compatible with
+    // `new Contract(addr, abi, signer)` — encode the call manually instead.
+    const data = contractInterface.current.encodeFunctionData('setValue', [newValue]);
 
     try {
-      const tx = await contract.setValue(newValue);
+      const tx = await signerRef.current.sendTransaction({
+        to: Environment.Contract,
+        data,
+        value: 0,
+      });
       await tx.wait();
       setNewValue('');
       setModalData({
@@ -177,12 +184,13 @@ function App() {
   };
 
   useEffect(() => {
-    providerRef.current?.on('block', () => {
-      handleFetchData();
-    });
-
+    const provider = providerRef.current;
+    if (!provider) return;
+    const listener = () => { handleFetchData(); };
+    void provider.on('block', listener);
     return () => {
-      providerRef.current?.removeListener('block', () => {});
+      // v6 Provider exposes `off`, not `removeListener`.
+      void provider.off('block', listener);
     };
   }, [providerRef.current]);
 
@@ -269,7 +277,7 @@ function App() {
                         <div>
                           <span className="text-sm text-gray-500">Last Setter:</span>
                           <span className="ml-2 text-gray-800 font-mono break-all">
-                            {ethers.utils.isAddress(lastSetter) ? formatAddress(lastSetter) : lastSetter}
+                            {isAddress(lastSetter) ? formatAddress(lastSetter) : lastSetter}
                           </span>
                         </div>
                       </div>

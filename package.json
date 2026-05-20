@@ -1,8 +1,9 @@
 {
   "name": "@incentiv/dapp-sdk",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "Incentiv dApp SDK",
   "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "files": [
     "dist/src",
     "src",
@@ -23,9 +24,10 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.24",
+    "ethers": "^6.13.5",
     "typescript": "^5.8.3"
   },
   "peerDependencies": {
-    "ethers": "^5.0.0"
+    "ethers": "^6.13.0"
   }
 }

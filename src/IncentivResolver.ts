@@ -1,5 +1,4 @@
-import { TransactionRequest } from "@ethersproject/abstract-provider";
-import { hexlify } from "ethers/lib/utils";
+import { hexlify, type TransactionRequest } from "ethers";
 import base64url from "base64url";
 
 export enum IncentivEnvironment {
@@ -33,7 +32,7 @@ export class IncentivResolver {
     constructor(environment: IncentivEnvironment | string) {
         this._portalUrl = environment;
     }
-    
+
     getPortalUrl() {
         return this._portalUrl;
     }
@@ -55,7 +54,7 @@ export class IncentivResolver {
 
             window.addEventListener('message', (event) => {
                 if (event.origin !== environment) return;
-                
+
                 const { type, address } = event.data || {};
                 if (type === 'CONNECT_RESOLVED') {
                     clearInterval(timerRef);
@@ -85,7 +84,7 @@ export class IncentivResolver {
                 maxPriorityFeePerGas: transaction.maxPriorityFeePerGas?.toString(),
                 maxFeePerGas: transaction.maxFeePerGas?.toString(),
             }
-            
+
             const encodedData = base64url.encode(JSON.stringify(dataObject));
 
             let hexCalldata = transaction.data ? hexlify(transaction.data) : "";
@@ -99,10 +98,10 @@ export class IncentivResolver {
                     reject(new Error("Popup closed"));
                 }
             }, 500);
-            
+
             window.addEventListener('message', (event) => {
                 if (event.origin !== this._portalUrl) return;
-                
+
                 const { type, hash } = event.data || {};
                 if (type === 'CALL_EXECUTED') {
                     clearInterval(timerRef);
@@ -144,10 +143,10 @@ export class IncentivResolver {
                     reject(new Error("Popup closed"));
                 }
             }, 500);
-            
+
             window.addEventListener('message', (event) => {
                 if (event.origin !== this._portalUrl) return;
-                
+
                 const { type, hash } = event.data || {};
                 if (type === 'BATCH_EXECUTED') {
                     clearInterval(timerRef);
@@ -175,22 +174,22 @@ export class IncentivResolver {
                 intent: "SIGN",
                 payload: message
             };
-            
+
             const encodedData = base64url.encode(JSON.stringify(dataObject));
             const popup = window.open(`${this._portalUrl}/dapp?data=${encodedData}`, "Popup", 'width=700,height=700');
-            
+
             const timerRef = setInterval(() => {
                 if(popup?.closed) {
                     clearInterval(timerRef);
                     reject(new Error("Popup closed"));
                 }
             }, 500);
-            
+
             window.addEventListener('message', (event) => {
                 if (event.origin !== this._portalUrl) return;
-                
+
                 const { type, payload, signature, owner, reason } = event.data || {};
-                
+
                 if (type === 'SIGN_RESOLVED') {
                     clearInterval(timerRef);
                     popup?.close();
@@ -213,4 +212,4 @@ export class IncentivResolver {
             });
         });
     }
-}   
+}
