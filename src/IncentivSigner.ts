@@ -175,7 +175,7 @@ class IncentivSigner {
         const response: IncentivTransactionResponse = {
             hash,
             from: fromAddr,
-            wait: (timeout: number = 60000) => this.waitForUserOp(hash, timeout),
+            wait: (timeout: number = 60000) => this.waitForUserOp(hash, fromAddr, timeout),
         };
         if (toAddr != null) response.to = toAddr;
         // AA nonces are uint256 — use getBigInt to preserve precision above 2^53.
@@ -191,26 +191,27 @@ class IncentivSigner {
         calls: BatchCall[],
         options: BatchRequestOptions
     ): Promise<IncentivTransactionResponse> {
+        const fromAddr = options.from ?? this.address;
         const hash = await this.incentivResolver.sendBatchTransaction(calls, options);
         // Omit per-call fields (`nonce`/`data`/`value`/`chainId`): a batch has no
         // single value for them, and unconditional defaults would be
         // indistinguishable from real zeros.
         const response: IncentivTransactionResponse = {
             hash,
-            from: options.from ?? this.address,
-            wait: (timeout: number = 60000) => this.waitForUserOp(hash, timeout),
+            from: fromAddr,
+            wait: (timeout: number = 60000) => this.waitForUserOp(hash, fromAddr, timeout),
         };
         if (options.gasLimit != null) response.gasLimit = getBigInt(options.gasLimit);
         return response;
     }
 
-    private waitForUserOp(hash: string, timeout: number): Promise<IncentivTransactionReceipt> {
+    private waitForUserOp(hash: string, sender: string, timeout: number): Promise<IncentivTransactionReceipt> {
         return new Promise<IncentivTransactionReceipt>((resolve, reject) => {
             const listener = new UserOperationEventListener(
                 resolve,
                 reject,
                 this.entryPoint,
-                this.address,
+                sender,
                 hash,
                 undefined,
                 timeout
