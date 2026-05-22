@@ -38,7 +38,7 @@ export class IncentivResolver {
     }
 
     static async getAccountAddress(environment: IncentivEnvironment | string): Promise<string> {
-        if(!window) {
+        if (typeof window === "undefined") {
             throw new Error("IncentivResolver must be used in a browser environment");
         }
 
@@ -79,7 +79,7 @@ export class IncentivResolver {
     }
 
     async sendTransaction(transaction: TransactionRequest): Promise<string> {
-        if(!window) {
+        if (typeof window === "undefined") {
             throw new Error("IncentivResolver must be used in a browser environment");
         }
         const portalUrl = this._portalUrl;
@@ -141,7 +141,7 @@ export class IncentivResolver {
     }
 
     async sendBatchTransaction(calls: BatchCall[], options: BatchRequestOptions): Promise<string> {
-        if(!window) {
+        if (typeof window === "undefined") {
             throw new Error("IncentivResolver must be used in a browser environment");
         }
         const portalUrl = this._portalUrl;
@@ -197,7 +197,7 @@ export class IncentivResolver {
     }
 
     async signMessage(message: string): Promise<SignResponse> {
-        if(!window) {
+        if (typeof window === "undefined") {
             throw new Error("IncentivResolver must be used in a browser environment");
         }
         const portalUrl = this._portalUrl;

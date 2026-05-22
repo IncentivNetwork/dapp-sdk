@@ -1,6 +1,7 @@
 import {
     AbiCoder,
     type ContractEventPayload,
+    type DeferredTopicFilter,
     type EventLog,
     type Log,
 } from "ethers";
@@ -18,6 +19,7 @@ const DEFAULT_TRANSACTION_TIMEOUT: number = 10000;
 export class UserOperationEventListener {
     resolved: boolean = false;
     private timer?: ReturnType<typeof setTimeout>;
+    private filter?: DeferredTopicFilter;
     private readonly boundListener: (...args: unknown[]) => Promise<void>;
 
     constructor(
@@ -40,13 +42,14 @@ export class UserOperationEventListener {
 
     start(): void {
         const filter = this.entryPoint.filters.UserOperationEvent(this.userOpHash);
+        this.filter = filter;
         // The listener takes a moment to register; first query directly in case the
         // UserOp was already mined.
         setTimeout(async () => {
             try {
                 const events = await this.entryPoint.queryFilter(filter, "latest");
                 if (events.length > 0) {
-                    void this.handleLog(events[0] as EventLog);
+                    await this.handleLog(events[0] as EventLog);
                 } else {
                     // BaseContract.once returns Promise<this> in v6; we don't await.
                     void this.entryPoint.once(filter, this.boundListener);
@@ -63,7 +66,12 @@ export class UserOperationEventListener {
             clearTimeout(this.timer);
             this.timer = undefined;
         }
-        void this.entryPoint.off("UserOperationEvent", this.boundListener);
+        if (this.filter) {
+            // v6 requires removing a filter-based listener by the same filter object,
+            // not by event name — `off("UserOperationEvent", …)` wouldn't match.
+            void this.entryPoint.off(this.filter, this.boundListener);
+            this.filter = undefined;
+        }
     }
 
     /**
@@ -72,8 +80,13 @@ export class UserOperationEventListener {
      * carries `args` and `getTransactionReceipt()`.
      */
     async listenerCallback(...params: unknown[]): Promise<void> {
-        const payload = params[params.length - 1] as ContractEventPayload;
-        await this.handleLog(payload.log);
+        try {
+            const payload = params[params.length - 1] as ContractEventPayload;
+            await this.handleLog(payload.log);
+        } catch (err) {
+            this.stop();
+            this.reject(err);
+        }
     }
 
     private async handleLog(log: EventLog | Log): Promise<void> {
@@ -116,7 +129,10 @@ export class UserOperationEventListener {
             transactionHash: this.userOpHash,
             blockNumber: txReceipt.blockNumber,
             blockHash: txReceipt.blockHash,
-            status: txReceipt.status ?? 1,
+            // Derive from the authoritative `args.success` so the receipt agrees with
+            // the UserOp result regardless of whether the bundler tx itself has a
+            // null/undefined `status` field.
+            status: args.success ? 1 : 0,
             from: txReceipt.from,
             to: txReceipt.to,
         });
