@@ -18,7 +18,6 @@ const PRECHECK_LOOKBACK_BLOCKS: number = 10;
  * with the decoded reason string.
  */
 export class UserOperationEventListener {
-    resolved: boolean = false;
     private settled: boolean = false;
     private timer?: ReturnType<typeof setTimeout>;
     private filter?: DeferredTopicFilter;
@@ -187,7 +186,6 @@ export class UserOperationEventListener {
             from: txReceipt.from,
             to: txReceipt.to,
         });
-        this.resolved = true;
     }
 
     private async extractFailureReason(blockNumber: number): Promise<string> {

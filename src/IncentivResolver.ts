@@ -1,4 +1,4 @@
-import { hexlify, type TransactionRequest } from "ethers";
+import { hexlify, resolveAddress, type TransactionRequest } from "ethers";
 import base64url from "base64url";
 
 export enum IncentivEnvironment {
@@ -95,11 +95,21 @@ export class IncentivResolver {
         }
         const portalUrl = this._portalUrl;
 
+        // v6 `AddressLike` accepts strings, `Addressable` (e.g. Contract instances),
+        // or Promises of either. Resolve to hex strings before JSON-stringifying
+        // into the popup URL — an Addressable would otherwise serialize to `{}`.
+        const fromAddr = transaction.from != null
+            ? await resolveAddress(transaction.from)
+            : undefined;
+        const toAddr = transaction.to != null
+            ? await resolveAddress(transaction.to)
+            : undefined;
+
         return new Promise((resolve, reject) => {
             const dataObject = {
                 intent: "CALL",
-                from: transaction.from,
-                to: transaction.to,
+                from: fromAddr,
+                to: toAddr,
                 gasLimit: transaction.gasLimit?.toString(),
                 gasPrice: transaction.gasPrice?.toString(),
                 value: transaction.value?.toString(),
