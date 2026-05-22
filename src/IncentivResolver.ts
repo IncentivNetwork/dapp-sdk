@@ -45,26 +45,36 @@ export class IncentivResolver {
         return new Promise((resolve, reject) => {
             const data = base64url.encode(JSON.stringify({ intent: "CONNECT" }));
             const popup = window.open(`${environment}/dapp?data=${data}`, "Popup", 'width=700,height=500');
-            const timerRef = setInterval(() => {
-                if(popup?.closed) {
-                    clearInterval(timerRef);
-                    reject(new Error("Popup closed"));
-                }
-            }, 500);
 
-            window.addEventListener('message', (event) => {
+            let cleanup: () => void;
+
+            const handleMessage = (event: MessageEvent) => {
                 if (event.origin !== environment) return;
 
                 const { type, address } = event.data || {};
                 if (type === 'CONNECT_RESOLVED') {
-                    clearInterval(timerRef);
+                    cleanup();
                     resolve(address);
                 }
                 else if (type === 'REJECTED') {
-                    clearInterval(timerRef);
+                    cleanup();
                     reject(new Error("User rejected connection"));
                 }
-            });
+            };
+
+            const timerRef = setInterval(() => {
+                if(popup?.closed) {
+                    cleanup();
+                    reject(new Error("Popup closed"));
+                }
+            }, 500);
+
+            cleanup = () => {
+                clearInterval(timerRef);
+                window.removeEventListener('message', handleMessage);
+            };
+
+            window.addEventListener('message', handleMessage);
         });
     }
 
@@ -72,6 +82,7 @@ export class IncentivResolver {
         if(!window) {
             throw new Error("IncentivResolver must be used in a browser environment");
         }
+        const portalUrl = this._portalUrl;
 
         return new Promise((resolve, reject) => {
             const dataObject = {
@@ -91,31 +102,41 @@ export class IncentivResolver {
             hexCalldata = hexCalldata.startsWith("0x") ? hexCalldata.slice(2) : hexCalldata;
             const encodedCalldata = base64url.encode(hexCalldata, 'hex')
 
-            const popup = window.open(`${this._portalUrl}/dapp?data=${encodedData}&calldata=${encodedCalldata}`, "Popup", 'width=700,height=700');
+            const popup = window.open(`${portalUrl}/dapp?data=${encodedData}&calldata=${encodedCalldata}`, "Popup", 'width=700,height=700');
+
+            let cleanup: () => void;
+
+            const handleMessage = (event: MessageEvent) => {
+                if (event.origin !== portalUrl) return;
+
+                const { type, hash } = event.data || {};
+                if (type === 'CALL_EXECUTED') {
+                    cleanup();
+                    resolve(hash);
+                }
+                else if (type === 'CALL_FAILED') {
+                    cleanup();
+                    reject(new Error("Call failed"));
+                }
+                else if (type === 'REJECTED') {
+                    cleanup();
+                    reject(new Error("User rejected call"));
+                }
+            };
+
             const timerRef = setInterval(() => {
                 if(popup?.closed) {
-                    clearInterval(timerRef);
+                    cleanup();
                     reject(new Error("Popup closed"));
                 }
             }, 500);
 
-            window.addEventListener('message', (event) => {
-                if (event.origin !== this._portalUrl) return;
+            cleanup = () => {
+                clearInterval(timerRef);
+                window.removeEventListener('message', handleMessage);
+            };
 
-                const { type, hash } = event.data || {};
-                if (type === 'CALL_EXECUTED') {
-                    clearInterval(timerRef);
-                    resolve(hash);
-                }
-                else if (type === 'CALL_FAILED') {
-                    clearInterval(timerRef);
-                    reject(new Error("Call failed"));
-                }
-                else if (type === 'REJECTED') {
-                    clearInterval(timerRef);
-                    reject(new Error("User rejected call"));
-                }
-            });
+            window.addEventListener('message', handleMessage);
         });
     }
 
@@ -123,6 +144,7 @@ export class IncentivResolver {
         if(!window) {
             throw new Error("IncentivResolver must be used in a browser environment");
         }
+        const portalUrl = this._portalUrl;
 
         return new Promise((resolve, reject) => {
             const dataObject = {
@@ -136,31 +158,41 @@ export class IncentivResolver {
             }
 
             const encodedData = base64url.encode(JSON.stringify(dataObject));
-            const popup = window.open(`${this._portalUrl}/dapp?data=${encodedData}`, "Popup", 'width=700,height=700');
+            const popup = window.open(`${portalUrl}/dapp?data=${encodedData}`, "Popup", 'width=700,height=700');
+
+            let cleanup: () => void;
+
+            const handleMessage = (event: MessageEvent) => {
+                if (event.origin !== portalUrl) return;
+
+                const { type, hash } = event.data || {};
+                if (type === 'BATCH_EXECUTED') {
+                    cleanup();
+                    resolve(hash);
+                }
+                else if (type === 'BATCH_FAILED') {
+                    cleanup();
+                    reject(new Error("Call failed"));
+                }
+                else if (type === 'REJECTED') {
+                    cleanup();
+                    reject(new Error("User rejected call"));
+                }
+            };
+
             const timerRef = setInterval(() => {
                 if(popup?.closed) {
-                    clearInterval(timerRef);
+                    cleanup();
                     reject(new Error("Popup closed"));
                 }
             }, 500);
 
-            window.addEventListener('message', (event) => {
-                if (event.origin !== this._portalUrl) return;
+            cleanup = () => {
+                clearInterval(timerRef);
+                window.removeEventListener('message', handleMessage);
+            };
 
-                const { type, hash } = event.data || {};
-                if (type === 'BATCH_EXECUTED') {
-                    clearInterval(timerRef);
-                    resolve(hash);
-                }
-                else if (type === 'BATCH_FAILED') {
-                    clearInterval(timerRef);
-                    reject(new Error("Call failed"));
-                }
-                else if (type === 'REJECTED') {
-                    clearInterval(timerRef);
-                    reject(new Error("User rejected call"));
-                }
-            });
+            window.addEventListener('message', handleMessage);
         });
     }
 
@@ -168,6 +200,7 @@ export class IncentivResolver {
         if(!window) {
             throw new Error("IncentivResolver must be used in a browser environment");
         }
+        const portalUrl = this._portalUrl;
 
         return new Promise((resolve, reject) => {
             const dataObject = {
@@ -176,22 +209,17 @@ export class IncentivResolver {
             };
 
             const encodedData = base64url.encode(JSON.stringify(dataObject));
-            const popup = window.open(`${this._portalUrl}/dapp?data=${encodedData}`, "Popup", 'width=700,height=700');
+            const popup = window.open(`${portalUrl}/dapp?data=${encodedData}`, "Popup", 'width=700,height=700');
 
-            const timerRef = setInterval(() => {
-                if(popup?.closed) {
-                    clearInterval(timerRef);
-                    reject(new Error("Popup closed"));
-                }
-            }, 500);
+            let cleanup: () => void;
 
-            window.addEventListener('message', (event) => {
-                if (event.origin !== this._portalUrl) return;
+            const handleMessage = (event: MessageEvent) => {
+                if (event.origin !== portalUrl) return;
 
                 const { type, payload, signature, owner, reason } = event.data || {};
 
                 if (type === 'SIGN_RESOLVED') {
-                    clearInterval(timerRef);
+                    cleanup();
                     popup?.close();
                     resolve({
                         payload,
@@ -200,16 +228,30 @@ export class IncentivResolver {
                     });
                 }
                 else if (type === 'SIGN_FAILED') {
-                    clearInterval(timerRef);
+                    cleanup();
                     popup?.close();
                     reject(new Error(`Sign failed: ${reason}`));
                 }
                 else if (type === 'REJECTED') {
-                    clearInterval(timerRef);
+                    cleanup();
                     popup?.close();
                     reject(new Error(`User rejected signature request: ${reason}`));
                 }
-            });
+            };
+
+            const timerRef = setInterval(() => {
+                if(popup?.closed) {
+                    cleanup();
+                    reject(new Error("Popup closed"));
+                }
+            }, 500);
+
+            cleanup = () => {
+                clearInterval(timerRef);
+                window.removeEventListener('message', handleMessage);
+            };
+
+            window.addEventListener('message', handleMessage);
         });
     }
 }

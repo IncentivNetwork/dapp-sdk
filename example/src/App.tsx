@@ -103,7 +103,7 @@ function App() {
       setNewValue('');
       setModalData({
         title: 'Transaction Sent!',
-        message: 'Your transaction has been sent successfully. Please wait for the data to be updated on the next conirmed block!',
+        message: 'Your transaction has been sent successfully. Please wait for the data to be updated on the next confirmed block!',
         isSuccess: true
       });
     } catch (err) {
