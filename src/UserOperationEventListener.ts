@@ -9,6 +9,7 @@ import type { EntryPoint } from "./contracts/entryPoint";
 import type { IncentivTransactionReceipt } from "./IncentivSigner";
 
 const DEFAULT_TRANSACTION_TIMEOUT: number = 10000;
+const PRECHECK_LOOKBACK_BLOCKS: number = 10;
 
 /**
  * Subscribes to the EntryPoint's `UserOperationEvent` for a specific userOpHash and
@@ -18,6 +19,7 @@ const DEFAULT_TRANSACTION_TIMEOUT: number = 10000;
  */
 export class UserOperationEventListener {
     resolved: boolean = false;
+    private settled: boolean = false;
     private timer?: ReturnType<typeof setTimeout>;
     private filter?: DeferredTopicFilter;
     private readonly boundListener: (...args: unknown[]) => Promise<void>;
@@ -34,31 +36,46 @@ export class UserOperationEventListener {
         this.boundListener = this.listenerCallback.bind(this) as (
             ...args: unknown[]
         ) => Promise<void>;
-        this.timer = setTimeout(() => {
-            this.stop();
-            this.reject(new Error("Timed out"));
-        }, this.timeout ?? DEFAULT_TRANSACTION_TIMEOUT);
     }
 
     start(): void {
+        // Timer belongs to the listener lifecycle: don't start ticking until
+        // start() is called.
+        this.timer = setTimeout(() => {
+            if (this.settled) return;
+            this.settled = true;
+            this.stop();
+            this.reject(new Error("Timed out"));
+        }, this.timeout ?? DEFAULT_TRANSACTION_TIMEOUT);
+
         const filter = this.entryPoint.filters.UserOperationEvent(this.userOpHash);
         this.filter = filter;
-        // The listener takes a moment to register; first query directly in case the
-        // UserOp was already mined.
-        setTimeout(async () => {
+
+        // Register the subscription BEFORE the lookback query: once() only fires
+        // for future events, so a UserOp mined between the lookback and the
+        // subscription would otherwise be lost. The lookback then catches a
+        // UserOp already mined before start() (realistic — a bundler can include
+        // it before the portal's postMessage round-trip completes). handleLog
+        // is idempotent via `settled`.
+        void this.entryPoint.once(filter, this.boundListener);
+
+        void (async () => {
             try {
-                const events = await this.entryPoint.queryFilter(filter, "latest");
-                if (events.length > 0) {
+                const events = await this.entryPoint.queryFilter(
+                    filter,
+                    -PRECHECK_LOOKBACK_BLOCKS,
+                    "latest"
+                );
+                if (events.length > 0 && !this.settled) {
                     await this.handleLog(events[0] as EventLog);
-                } else {
-                    // BaseContract.once returns Promise<this> in v6; we don't await.
-                    void this.entryPoint.once(filter, this.boundListener);
                 }
             } catch (err) {
+                if (this.settled) return;
+                this.settled = true;
                 this.stop();
                 this.reject(err);
             }
-        }, 100);
+        })();
     }
 
     stop(): void {
@@ -67,8 +84,8 @@ export class UserOperationEventListener {
             this.timer = undefined;
         }
         if (this.filter) {
-            // v6 requires removing a filter-based listener by the same filter object,
-            // not by event name — `off("UserOperationEvent", …)` wouldn't match.
+            // v6 requires removing a filter-based listener by the same filter
+            // object, not by event name.
             void this.entryPoint.off(this.filter, this.boundListener);
             this.filter = undefined;
         }
@@ -80,16 +97,21 @@ export class UserOperationEventListener {
      * carries `args` and `getTransactionReceipt()`.
      */
     async listenerCallback(...params: unknown[]): Promise<void> {
+        if (this.settled) return;
         try {
             const payload = params[params.length - 1] as ContractEventPayload;
             await this.handleLog(payload.log);
         } catch (err) {
+            if (this.settled) return;
+            this.settled = true;
             this.stop();
             this.reject(err);
         }
     }
 
     private async handleLog(log: EventLog | Log): Promise<void> {
+        if (this.settled) return;
+
         const args = (log as EventLog).args;
         if (args == null) {
             console.error("got event without args", log);
@@ -107,12 +129,16 @@ export class UserOperationEventListener {
 
         const txReceipt = await log.getTransactionReceipt();
         if (txReceipt == null) {
+            if (this.settled) return;
+            this.settled = true;
             this.stop();
             this.reject(new Error("Transaction receipt unavailable"));
             return;
         }
 
         if (!args.success) {
+            if (this.settled) return;
+            this.settled = true;
             try {
                 const reason = await this.extractFailureReason(txReceipt.blockNumber);
                 this.stop();
@@ -124,6 +150,8 @@ export class UserOperationEventListener {
             return;
         }
 
+        if (this.settled) return;
+        this.settled = true;
         this.stop();
         this.resolve({
             transactionHash: this.userOpHash,

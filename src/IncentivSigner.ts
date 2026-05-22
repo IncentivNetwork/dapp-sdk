@@ -52,16 +52,21 @@ export interface IncentivTransactionReceipt {
  * cannot produce a fully-populated ethers `TransactionResponse` synchronously (we
  * don't have a signature, blob hashes, accessList, etc.), and faking those fields
  * would mislead callers. Use `wait()` to obtain the receipt once the UserOp is mined.
+ *
+ * `nonce`, `gasLimit`, `data`, `value`, and `chainId` are optional because the
+ * batch path can't supply meaningful per-call values, and on the single-call path
+ * the caller may also leave them unset. `nonce` is a `bigint` (AA nonces are uint256
+ * — `Number` would silently truncate above 2^53).
  */
 export interface IncentivTransactionResponse {
     hash: string;
     from: string;
     to?: string;
-    nonce: number;
-    gasLimit: bigint;
-    data: string;
-    value: bigint;
-    chainId: bigint;
+    nonce?: bigint;
+    gasLimit?: bigint;
+    data?: string;
+    value?: bigint;
+    chainId?: bigint;
     wait: (timeout?: number) => Promise<IncentivTransactionReceipt>;
 }
 
@@ -109,6 +114,14 @@ class IncentivSigner {
         return Promise.resolve(this.address);
     }
 
+    /**
+     * Sign a message and return the legacy `${signature}:${owner}` colon-joined form.
+     *
+     * @deprecated Use `signMessageDetailed()` instead — it returns the structured
+     * `SignResponse` and is safer to parse. The colon-joined form is fragile (any
+     * downstream code that splits on `":"` breaks if `owner` ever contains one) and
+     * will be removed in 0.3.0. Kept in 0.2.x for backwards compatibility.
+     */
     async signMessage(message: BytesLike | string): Promise<string> {
         const messageString = typeof message === "string" ? message : toUtf8String(message);
 
@@ -142,17 +155,19 @@ class IncentivSigner {
 
     async sendTransaction(transaction: TransactionRequest): Promise<IncentivTransactionResponse> {
         const hash = await this.incentivResolver.sendTransaction(transaction);
-        return {
+        const response: IncentivTransactionResponse = {
             hash,
             from: (transaction.from as string | undefined) ?? this.address,
-            to: (transaction.to as string | undefined) ?? undefined,
-            nonce: Number(transaction.nonce ?? 0),
-            gasLimit: getBigInt(transaction.gasLimit ?? 0),
-            data: transaction.data != null ? hexlify(transaction.data) : "",
-            value: getBigInt(transaction.value ?? 0),
-            chainId: getBigInt(transaction.chainId ?? 0),
             wait: (timeout: number = 60000) => this.waitForUserOp(hash, timeout),
         };
+        if (transaction.to != null) response.to = transaction.to as string;
+        // AA nonces are uint256 — use getBigInt to preserve precision above 2^53.
+        if (transaction.nonce != null) response.nonce = getBigInt(transaction.nonce);
+        if (transaction.gasLimit != null) response.gasLimit = getBigInt(transaction.gasLimit);
+        if (transaction.data != null) response.data = hexlify(transaction.data);
+        if (transaction.value != null) response.value = getBigInt(transaction.value);
+        if (transaction.chainId != null) response.chainId = getBigInt(transaction.chainId);
+        return response;
     }
 
     async sendBatchTransaction(
@@ -160,16 +175,16 @@ class IncentivSigner {
         options: BatchRequestOptions
     ): Promise<IncentivTransactionResponse> {
         const hash = await this.incentivResolver.sendBatchTransaction(calls, options);
-        return {
+        // Omit per-call fields (`nonce`/`data`/`value`/`chainId`): a batch has no
+        // single value for them, and unconditional defaults would be
+        // indistinguishable from real zeros.
+        const response: IncentivTransactionResponse = {
             hash,
             from: options.from ?? this.address,
-            nonce: 0,
-            gasLimit: getBigInt(options.gasLimit ?? 0),
-            data: "",
-            value: 0n,
-            chainId: 0n,
             wait: (timeout: number = 60000) => this.waitForUserOp(hash, timeout),
         };
+        if (options.gasLimit != null) response.gasLimit = getBigInt(options.gasLimit);
+        return response;
     }
 
     private waitForUserOp(hash: string, timeout: number): Promise<IncentivTransactionReceipt> {

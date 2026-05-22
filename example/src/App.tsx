@@ -16,7 +16,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [modalData, setModalData] = useState<ModalData | null>(null);
-  
+
   // Tabs and signing state
   const [activeTab, setActiveTab] = useState<'transaction' | 'sign'>('transaction');
   const [messageToSign, setMessageToSign] = useState<string>('');
@@ -25,8 +25,10 @@ function App() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{ isValid: boolean; accountAddress: string } | null>(null);
 
-  const providerRef = useRef<Provider | null>(null);
-  const signerRef = useRef<IncentivSigner | null>(null);
+  // Provider/signer live in state, not refs, so the block-subscription effect
+  // re-runs once they become available — refs don't trigger re-renders.
+  const [provider, setProvider] = useState<Provider | null>(null);
+  const [signer, setSigner] = useState<IncentivSigner | null>(null);
   const contractInterface = useRef(new Interface(Config.ABI));
 
   const handleConnect = async () => {
@@ -42,20 +44,23 @@ function App() {
 
         // Create a regular ethers provider. `staticNetwork: true` matches v5's
         // StaticJsonRpcProvider behavior (skip per-request chainId checks).
-        providerRef.current = new JsonRpcProvider(Environment.RPC, undefined, {
+        const nextProvider = new JsonRpcProvider(Environment.RPC, undefined, {
           staticNetwork: true,
         });
 
         // Create a signer that can sign transactions with the Incentiv portal
-        signerRef.current = new IncentivSigner({
+        const nextSigner = new IncentivSigner({
           address: address,
-          provider: providerRef.current,
+          provider: nextProvider,
           environment: Environment.Portal,
           entryPoint: Environment.EntryPoint,
           verifierContract: Environment.VerifierContract
         });
 
-        handleFetchData();
+        setProvider(nextProvider);
+        setSigner(nextSigner);
+
+        fetchDataWith(nextProvider);
       })
       .catch((err) => {
         setIsConnecting(false);
@@ -63,14 +68,12 @@ function App() {
       });
   };
 
-  const handleFetchData = async () => {
-    if (!providerRef.current) return;
-
+  const fetchDataWith = async (p: Provider) => {
     // Reads go through the regular provider — IncentivSigner is for write paths only.
     const contract = new Contract(
       Environment.Contract,
       Config.ABI,
-      providerRef.current
+      p
     );
 
     const value = await contract.storedValue();
@@ -83,9 +86,9 @@ function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    if (!signerRef.current) return;
-    
+
+    if (!signer) return;
+
     setIsLoading(true);
 
     // Send transaction! This will request a popup to be opened in the Incentiv portal.
@@ -94,7 +97,7 @@ function App() {
     const data = contractInterface.current.encodeFunctionData('setValue', [newValue]);
 
     try {
-      const tx = await signerRef.current.sendTransaction({
+      const tx = await signer.sendTransaction({
         to: Environment.Contract,
         data,
         value: 0,
@@ -124,12 +127,12 @@ function App() {
     setSignatureResult(null);
     setVerificationResult(null);
     
-    if (!signerRef.current || !messageToSign.trim()) return;
-    
+    if (!signer || !messageToSign.trim()) return;
+
     setIsSigningMessage(true);
 
     try {
-      const response = await signerRef.current.signMessageDetailed(messageToSign);
+      const response = await signer.signMessageDetailed(messageToSign);
       setSignatureResult(response);
       setModalData({
         title: 'Message Signed!',
@@ -148,13 +151,13 @@ function App() {
   };
 
   const handleVerifySignature = async () => {
-    if (!signerRef.current || !signatureResult || !messageToSign) return;
-    
+    if (!signer || !signatureResult || !messageToSign) return;
+
     setIsVerifying(true);
     setVerificationResult(null);
 
     try {
-      const result = await signerRef.current.verifySignature(
+      const result = await signer.verifySignature(
         messageToSign,
         signatureResult.signature,
         signatureResult.owner
@@ -184,15 +187,14 @@ function App() {
   };
 
   useEffect(() => {
-    const provider = providerRef.current;
     if (!provider) return;
-    const listener = () => { handleFetchData(); };
+    const listener = () => { void fetchDataWith(provider); };
     void provider.on('block', listener);
     return () => {
       // v6 Provider exposes `off`, not `removeListener`.
       void provider.off('block', listener);
     };
-  }, [providerRef.current]);
+  }, [provider]);
 
   return (
     <>

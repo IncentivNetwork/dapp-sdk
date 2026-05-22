@@ -50,6 +50,10 @@ export class IncentivResolver {
 
             const handleMessage = (event: MessageEvent) => {
                 if (event.origin !== environment) return;
+                // event.source is the Window that called postMessage. Cross-checking
+                // it against the popup we just opened is defense-in-depth against
+                // a same-origin iframe spoofing the portal's response.
+                if (event.source !== popup) return;
 
                 const { type, address } = event.data || {};
                 if (type === 'CONNECT_RESOLVED') {
@@ -108,6 +112,7 @@ export class IncentivResolver {
 
             const handleMessage = (event: MessageEvent) => {
                 if (event.origin !== portalUrl) return;
+                if (event.source !== popup) return;
 
                 const { type, hash } = event.data || {};
                 if (type === 'CALL_EXECUTED') {
@@ -164,6 +169,7 @@ export class IncentivResolver {
 
             const handleMessage = (event: MessageEvent) => {
                 if (event.origin !== portalUrl) return;
+                if (event.source !== popup) return;
 
                 const { type, hash } = event.data || {};
                 if (type === 'BATCH_EXECUTED') {
@@ -215,6 +221,7 @@ export class IncentivResolver {
 
             const handleMessage = (event: MessageEvent) => {
                 if (event.origin !== portalUrl) return;
+                if (event.source !== popup) return;
 
                 const { type, payload, signature, owner, reason } = event.data || {};
 
