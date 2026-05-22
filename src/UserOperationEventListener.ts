@@ -61,9 +61,21 @@ export class UserOperationEventListener {
 
         void (async () => {
             try {
+                // eth_getLogs requires an absolute fromBlock — negative offsets
+                // are not part of the JSON-RPC spec and ethers v6 does not
+                // normalize them. Resolve the current block first and clamp
+                // at 0 (chains < lookback blocks old, or non-EVM mocks).
+                const provider = this.entryPoint.runner?.provider;
+                if (provider == null) {
+                    // No provider on the runner; skip the lookback. The live
+                    // subscription will still catch any future UserOp.
+                    return;
+                }
+                const currentBlock = await provider.getBlockNumber();
+                const fromBlock = Math.max(0, currentBlock - PRECHECK_LOOKBACK_BLOCKS);
                 const events = await this.entryPoint.queryFilter(
                     filter,
-                    -PRECHECK_LOOKBACK_BLOCKS,
+                    fromBlock,
                     "latest"
                 );
                 if (events.length > 0 && !this.settled) {

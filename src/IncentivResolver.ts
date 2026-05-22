@@ -46,6 +46,13 @@ export class IncentivResolver {
             const data = base64url.encode(JSON.stringify({ intent: "CONNECT" }));
             const popup = window.open(`${environment}/dapp?data=${data}`, "Popup", 'width=700,height=500');
 
+            // Popup blockers return null. Without this guard `event.source !== popup`
+            // would silently drop every message and the Promise would hang to timeout.
+            if (!popup) {
+                reject(new Error("Popup blocked. Please allow popups for this site and try again."));
+                return;
+            }
+
             let cleanup: () => void;
 
             const handleMessage = (event: MessageEvent) => {
@@ -108,6 +115,11 @@ export class IncentivResolver {
 
             const popup = window.open(`${portalUrl}/dapp?data=${encodedData}&calldata=${encodedCalldata}`, "Popup", 'width=700,height=700');
 
+            if (!popup) {
+                reject(new Error("Popup blocked. Please allow popups for this site and try again."));
+                return;
+            }
+
             let cleanup: () => void;
 
             const handleMessage = (event: MessageEvent) => {
@@ -165,6 +177,11 @@ export class IncentivResolver {
             const encodedData = base64url.encode(JSON.stringify(dataObject));
             const popup = window.open(`${portalUrl}/dapp?data=${encodedData}`, "Popup", 'width=700,height=700');
 
+            if (!popup) {
+                reject(new Error("Popup blocked. Please allow popups for this site and try again."));
+                return;
+            }
+
             let cleanup: () => void;
 
             const handleMessage = (event: MessageEvent) => {
@@ -216,6 +233,11 @@ export class IncentivResolver {
 
             const encodedData = base64url.encode(JSON.stringify(dataObject));
             const popup = window.open(`${portalUrl}/dapp?data=${encodedData}`, "Popup", 'width=700,height=700');
+
+            if (!popup) {
+                reject(new Error("Popup blocked. Please allow popups for this site and try again."));
+                return;
+            }
 
             let cleanup: () => void;
 

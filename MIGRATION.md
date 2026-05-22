@@ -41,11 +41,14 @@ interface IncentivTransactionResponse {
   hash: string;       // UserOp hash
   from: string;
   to?: string;
-  nonce: number;
-  gasLimit: bigint;   // was: ethers.BigNumber
-  data: string;
-  value: bigint;      // was: ethers.BigNumber
-  chainId: bigint;    // was: number
+  // Optional: the batch path can't supply meaningful per-call values, and
+  // the single-call path only populates fields the caller passed in.
+  nonce?: bigint;     // was: BigNumber. AA nonces are uint256, so bigint
+                      // (not number) — Number would truncate above 2^53.
+  gasLimit?: bigint;  // was: ethers.BigNumber
+  data?: string;
+  value?: bigint;     // was: ethers.BigNumber
+  chainId?: bigint;   // was: number
   wait: (timeoutMs?: number) => Promise<IncentivTransactionReceipt>;
 }
 ```
