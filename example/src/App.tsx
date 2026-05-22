@@ -60,7 +60,9 @@ function App() {
         setProvider(nextProvider);
         setSigner(nextSigner);
 
-        fetchDataWith(nextProvider);
+        fetchDataWith(nextProvider).catch((err) =>
+          setError(`Failed to load contract state. ${err}`)
+        );
       })
       .catch((err) => {
         setIsConnecting(false);
@@ -188,7 +190,11 @@ function App() {
 
   useEffect(() => {
     if (!provider) return;
-    const listener = () => { void fetchDataWith(provider); };
+    const listener = () => {
+      fetchDataWith(provider).catch((err) =>
+        setError(`Failed to refresh contract state. ${err}`)
+      );
+    };
     void provider.on('block', listener);
     return () => {
       // v6 Provider exposes `off`, not `removeListener`.
