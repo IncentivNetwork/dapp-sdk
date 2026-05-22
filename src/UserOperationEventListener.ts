@@ -65,13 +65,24 @@ export class UserOperationEventListener {
                 // are not part of the JSON-RPC spec and ethers v6 does not
                 // normalize them. Resolve the current block first and clamp
                 // at 0 (chains < lookback blocks old, or non-EVM mocks).
-                const provider = this.entryPoint.runner?.provider;
-                if (provider == null) {
+                //
+                // Prefer the runner itself when it can answer getBlockNumber()
+                // (i.e. the runner is a Provider). v6's AbstractProvider exposes
+                // a `provider` getter that returns `this`, so for any in-tree
+                // Provider both paths work — but a custom ContractRunner whose
+                // `.provider` is unset would otherwise skip the lookback.
+                const runner = this.entryPoint.runner;
+                const blockSource =
+                    runner != null &&
+                    typeof (runner as { getBlockNumber?: unknown }).getBlockNumber === "function"
+                        ? (runner as unknown as { getBlockNumber: () => Promise<number> })
+                        : runner?.provider ?? null;
+                if (blockSource == null) {
                     // No provider on the runner; skip the lookback. The live
                     // subscription will still catch any future UserOp.
                     return;
                 }
-                const currentBlock = await provider.getBlockNumber();
+                const currentBlock = await blockSource.getBlockNumber();
                 const fromBlock = Math.max(0, currentBlock - PRECHECK_LOOKBACK_BLOCKS);
                 const events = await this.entryPoint.queryFilter(
                     filter,

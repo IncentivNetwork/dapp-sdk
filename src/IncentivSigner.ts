@@ -4,6 +4,7 @@ import {
     getBytes,
     hexlify,
     isAddress,
+    resolveAddress,
     toUtf8Bytes,
     toUtf8String,
     type BytesLike,
@@ -154,13 +155,29 @@ class IncentivSigner {
     }
 
     async sendTransaction(transaction: TransactionRequest): Promise<IncentivTransactionResponse> {
-        const hash = await this.incentivResolver.sendTransaction(transaction);
+        // v6 `AddressLike` accepts strings, `Addressable` (e.g. a Contract instance),
+        // or a Promise of either. We must resolve both to hex strings before forwarding
+        // to the Portal — the resolver JSON-stringifies the request into the popup URL,
+        // which would otherwise embed `[object Object]` for Addressable inputs.
+        const fromAddr = transaction.from != null
+            ? await resolveAddress(transaction.from)
+            : this.address;
+        const toAddr = transaction.to != null
+            ? await resolveAddress(transaction.to)
+            : undefined;
+
+        const normalized: TransactionRequest = {
+            ...transaction,
+            from: fromAddr,
+            to: toAddr ?? null,
+        };
+        const hash = await this.incentivResolver.sendTransaction(normalized);
         const response: IncentivTransactionResponse = {
             hash,
-            from: (transaction.from as string | undefined) ?? this.address,
+            from: fromAddr,
             wait: (timeout: number = 60000) => this.waitForUserOp(hash, timeout),
         };
-        if (transaction.to != null) response.to = transaction.to as string;
+        if (toAddr != null) response.to = toAddr;
         // AA nonces are uint256 — use getBigInt to preserve precision above 2^53.
         if (transaction.nonce != null) response.nonce = getBigInt(transaction.nonce);
         if (transaction.gasLimit != null) response.gasLimit = getBigInt(transaction.gasLimit);
