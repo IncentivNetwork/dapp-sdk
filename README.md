@@ -14,14 +14,14 @@ The **Incentiv dApp SDK** solves this by:
 * Opening a secure pop‑up in the Incentiv Portal when you need the user to sign.
 * Submitting the resulting *UserOperation* on your behalf.
 * Returning the **UserOperation hash** so that you can track it afterwards.
-* Providing a drop‑in [`ethers.js`](https://docs.ethers.org/v5/) `Signer` so you can keep the rest of your code unchanged.
+* Providing an `IncentivSigner` with a familiar `sendTransaction()` API built on top of [`ethers.js v6`](https://docs.ethers.org/v6/).
 
 ---
 
 ## Features
 
 * **Zero private‑key handling** in your site – users sign inside the Portal
-* **`IncentivSigner`** → works anywhere an `ethers.Signer` is expected
+* **`IncentivSigner`** → AA-aware signer with a `sendTransaction()` API + UserOp `wait()` semantics
 * **`IncentivResolver`** → low‑level helper if you don't use ethers
 * Supports **Staging**, **Testnet** & **Mainnet** (or any custom Portal URL)
 * Ships with **TypeScript types**
@@ -31,20 +31,20 @@ The **Incentiv dApp SDK** solves this by:
 ## Installation
 
 ```bash
-npm install @incentiv/dapp-sdk ethers@5.7.2        # ethers v5 is required
+npm install @incentiv/dapp-sdk ethers@^6.13.0      # ethers v6 is required
 # or
-yarn add @incentiv/dapp-sdk ethers@5.7.2
+yarn add @incentiv/dapp-sdk ethers@^6.13.0
 ```
 
-> **ethers v5.x only** for now
+> Requires **ethers v6.x**. For the v5-compatible release, install `@incentiv/dapp-sdk@^0.1.9`.
 
 ---
 
 ## Quick start
 
 ```ts
-import { IncentivSigner, IncentivResolver } from "@incentiv/sdk";
-import { ethers } from "ethers";
+import { IncentivSigner, IncentivResolver } from "@incentiv/dapp-sdk";
+import { Interface, JsonRpcProvider, parseEther } from "ethers";
 
 /**
  * Choose which Incentiv environment you want to talk to
@@ -60,10 +60,10 @@ async function main () {
   // Ask the Portal to connect and give us the user's address
   const address = await IncentivResolver.getAccountAddress(Environment.Portal);
 
-  // Standard ethers provider
-  const provider = new ethers.providers.StaticJsonRpcProvider(Environment.RPC);
+  // Standard ethers v6 provider
+  const provider = new JsonRpcProvider(Environment.RPC, undefined, { staticNetwork: true });
 
-  // Drop‑in signer – use it just like any ethers.Signer
+  // AA-aware signer
   const signer = new IncentivSigner({
     address,
     provider,
@@ -72,21 +72,49 @@ async function main () {
     verifierContract: Environment.VerifierContract
   });
 
+  // Encode the contract call manually — IncentivSigner is not a drop-in
+  // ethers.Signer (see "Sending contract calls" below).
+  const iface = new Interface(["function transfer(address to, uint256 amount)"]);
+  const data = iface.encodeFunctionData("transfer", ["0xRecipient", 1000n]);
+
   // Send a transaction – the Portal pop‑up will appear automatically
-  const userOpReceipt = await signer.sendTransaction({
+  const tx = await signer.sendTransaction({
     to: "0xYourContract",
-    data: "0x…",                                 // encoded calldata
-    value: ethers.utils.parseEther("0.01")
+    data,
+    value: parseEther("0.01")
   });
 
-  console.log("UserOperation hash:", userOpReceipt.hash);
+  console.log("UserOperation hash:", tx.hash);
 
-  // Wait for confirmation
-  await userOpReceipt.wait();
+  // Wait for the UserOp to be mined
+  const receipt = await tx.wait(60_000);
+  console.log("Mined in block:", receipt.blockNumber, "status:", receipt.status);
 }
 
 main().catch(console.error);
 ```
+
+### Sending contract calls
+
+As of `0.2.0`, `IncentivSigner` no longer extends `ethers.Signer` / `AbstractSigner`,
+so it cannot be passed directly to `new ethers.Contract(addr, abi, signer)` for
+write calls. Encode the calldata yourself and call `sendTransaction()`:
+
+```ts
+import { Contract, Interface } from "ethers";
+
+// Reads — use the provider directly
+const reader = new Contract(addr, abi, provider);
+const value  = await reader.storedValue();
+
+// Writes — encode calldata, then send through IncentivSigner
+const iface = new Interface(abi);
+const data  = iface.encodeFunctionData("setValue", [42]);
+const tx    = await signer.sendTransaction({ to: addr, data, value: 0 });
+await tx.wait();
+```
+
+See `MIGRATION.md` for the full v5 → v6 cheat‑sheet.
 
 ### Browser‑only
 
@@ -106,8 +134,8 @@ The SDK supports signing arbitrary messages through the Incentiv Portal and veri
 ### Example: Sign a Message
 
 ```ts
-import { IncentivSigner } from "@incentiv/sdk";
-import { ethers } from "ethers";
+import { IncentivSigner } from "@incentiv/dapp-sdk";
+import { JsonRpcProvider } from "ethers";
 
 const Environment = {
   Portal: "https://portal.incentiv.io",
@@ -117,8 +145,8 @@ const Environment = {
 };
 
 async function signAndVerify() {
-  const provider = new ethers.providers.StaticJsonRpcProvider(Environment.RPC);
-  
+  const provider = new JsonRpcProvider(Environment.RPC, undefined, { staticNetwork: true });
+
   const signer = new IncentivSigner({
     address: "0x...",  // Your user's AA wallet address
     provider,
@@ -180,17 +208,20 @@ This allows you to prove that a user controls a specific AA wallet without requi
 
 ---
 
-### `class IncentivSigner extends ethers.Signer`
+### `class IncentivSigner`
+
+> As of `0.2.0` this class is **not** a subclass of `ethers.Signer` / `AbstractSigner`.
+> See [Sending contract calls](#sending-contract-calls) for the encoding pattern.
 
 | Method                                                  | Notes                                                                                                                                     |
 | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `getAccountAddress()`                                   | Same as the static resolver call but also stores the address internally.                                                                  |
-| `sendTransaction(tx)`                                   | Returns a `TransactionResponse`‑like object whose `.hash` is the **UserOperation hash**. The `.wait()` method is **not implemented yet**. |
-| `sendBatchTransaction(calls: BatchCall[], options: BatchRequestOptions)` | Returns a `TransactionResponse`‑like object for batch transactions. Executes multiple calls in a single UserOperation with full `.wait()` support. |
-| `signMessage(message)`                                  | Opens the Portal popup to sign an arbitrary message. Returns the signature as a string concatenated with the owner data with a colon separator. Concatenation is done to preserve compatibility with ethers signer interface. For ease of use, you can use the `signMessageDetailed()` method instead.   |
+| `sendTransaction(tx)`                                   | Returns an `IncentivTransactionResponse` whose `.hash` is the **UserOperation hash**. Call `.wait(timeoutMs)` to resolve once the UserOp is mined. |
+| `sendBatchTransaction(calls: BatchCall[], options: BatchRequestOptions)` | Returns an `IncentivTransactionResponse` for batch transactions. Executes multiple calls in a single UserOperation with full `.wait()` support. |
+| `signMessage(message)`                                  | Opens the Portal popup to sign an arbitrary message. Returns the signature as a string concatenated with the owner data via a colon separator. For ease of use, prefer `signMessageDetailed()`.   |
 | `signMessageDetailed(message)`                          | Same as `signMessage()` but returns a `SignResponse` object containing the signature and owner data separately.                                 |
-| `verifySignature(message, signature, owner)`            | Verifies a signature on-chain using the Verifier contract. Returns `{ isValid: boolean, accountAddress: string }`. `accountAddress` is the address of the AA wallet that is owned by the message signer. Requires `verifierContract` to be set in constructor. |
-| `connect(provider)`                                     | Returns a new signer instance bound to the given provider.                                                                                |
+| `verifySignature(message, signature, owner)`            | Verifies a signature on-chain using the Verifier contract. Returns `{ isValid: boolean, accountAddress: string }`. `accountAddress` is the address of the AA wallet owned by the message signer. Requires `verifierContract` to be set in the constructor. |
+| `connect(provider)`                                     | Returns a new `IncentivSigner` instance bound to the given provider.                                                                      |
 | `setAccountAddress(address)`                            | Manually set / override the account address.                                                                                              |
 
 > `signTransaction` is intentionally **unsupported** – transaction signing happens inside the Portal UI through `sendTransaction()` or `sendBatchTransaction()`.
@@ -223,6 +254,35 @@ interface BatchRequestOptions {
 interface SignResponse {
   signature: string;  // The cryptographic signature
   owner: string;      // The owner/key data used to create the signature
+}
+```
+
+#### UserOp Response / Receipt
+
+```ts
+interface IncentivTransactionResponse {
+  hash: string;                  // UserOperation hash
+  from: string;
+  to?: string;
+  // The fields below are optional: the batch path can't supply meaningful
+  // per-call values, and the single-call path only populates whatever the
+  // caller passed in. `nonce` is `bigint` because AA nonces are uint256 —
+  // `Number` would silently truncate above 2^53.
+  nonce?: bigint;
+  gasLimit?: bigint;
+  data?: string;
+  value?: bigint;
+  chainId?: bigint;
+  wait: (timeoutMs?: number) => Promise<IncentivTransactionReceipt>;
+}
+
+interface IncentivTransactionReceipt {
+  transactionHash: string;       // == UserOp hash (NOT the bundler tx hash)
+  blockNumber: number;
+  blockHash: string;
+  status: number;                // 1 on success, 0 on revert
+  from: string;
+  to: string | null;
 }
 ```
 

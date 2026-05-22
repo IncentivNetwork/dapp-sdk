@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { IncentivResolver, IncentivSigner, type SignResponse } from '@incentiv/dapp-sdk';
 import { Modal, type ModalData } from './components/Modal';
-import { ethers } from 'ethers';
+import { Contract, Interface, JsonRpcProvider, isAddress, type Provider } from 'ethers';
 import Config from './config';
 
 function App() {
@@ -16,7 +16,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [modalData, setModalData] = useState<ModalData | null>(null);
-  
+
   // Tabs and signing state
   const [activeTab, setActiveTab] = useState<'transaction' | 'sign'>('transaction');
   const [messageToSign, setMessageToSign] = useState<string>('');
@@ -25,8 +25,11 @@ function App() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{ isValid: boolean; accountAddress: string } | null>(null);
 
-  const providerRef = useRef<ethers.providers.Provider | null>(null);
-  const signerRef = useRef<IncentivSigner | null>(null);
+  // Provider/signer live in state, not refs, so the block-subscription effect
+  // re-runs once they become available — refs don't trigger re-renders.
+  const [provider, setProvider] = useState<Provider | null>(null);
+  const [signer, setSigner] = useState<IncentivSigner | null>(null);
+  const contractInterface = useRef(new Interface(Config.ABI));
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -39,19 +42,27 @@ function App() {
         setUserAddress(address);
         setIsConnecting(false);
 
-        // Create a regular ethers provider
-        providerRef.current = new ethers.providers.StaticJsonRpcProvider(Environment.RPC);
+        // Create a regular ethers provider. `staticNetwork: true` matches v5's
+        // StaticJsonRpcProvider behavior (skip per-request chainId checks).
+        const nextProvider = new JsonRpcProvider(Environment.RPC, undefined, {
+          staticNetwork: true,
+        });
 
         // Create a signer that can sign transactions with the Incentiv portal
-        signerRef.current = new IncentivSigner({
+        const nextSigner = new IncentivSigner({
           address: address,
-          provider: providerRef.current,
+          provider: nextProvider,
           environment: Environment.Portal,
           entryPoint: Environment.EntryPoint,
           verifierContract: Environment.VerifierContract
         });
 
-        handleFetchData();
+        setProvider(nextProvider);
+        setSigner(nextSigner);
+
+        fetchDataWith(nextProvider).catch((err) =>
+          setError(`Failed to load contract state. ${err}`)
+        );
       })
       .catch((err) => {
         setIsConnecting(false);
@@ -59,13 +70,12 @@ function App() {
       });
   };
 
-  const handleFetchData = async () => {
-    if (!signerRef.current) return;
-
-    const contract = new ethers.Contract(
+  const fetchDataWith = async (p: Provider) => {
+    // Reads go through the regular provider — IncentivSigner is for write paths only.
+    const contract = new Contract(
       Environment.Contract,
       Config.ABI,
-      signerRef.current
+      p
     );
 
     const value = await contract.storedValue();
@@ -78,25 +88,27 @@ function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    if (!signerRef.current) return;
-    
+
+    if (!signer) return;
+
     setIsLoading(true);
 
     // Send transaction! This will request a popup to be opened in the Incentiv portal.
-    const contract = new ethers.Contract(
-      Environment.Contract,
-      Config.ABI,
-      signerRef.current
-    );
+    // As of dapp-sdk 0.2.0, IncentivSigner is no longer compatible with
+    // `new Contract(addr, abi, signer)` — encode the call manually instead.
+    const data = contractInterface.current.encodeFunctionData('setValue', [newValue]);
 
     try {
-      const tx = await contract.setValue(newValue);
+      const tx = await signer.sendTransaction({
+        to: Environment.Contract,
+        data,
+        value: 0,
+      });
       await tx.wait();
       setNewValue('');
       setModalData({
         title: 'Transaction Sent!',
-        message: 'Your transaction has been sent successfully. Please wait for the data to be updated on the next conirmed block!',
+        message: 'Your transaction has been sent successfully. Please wait for the data to be updated on the next confirmed block!',
         isSuccess: true
       });
     } catch (err) {
@@ -117,12 +129,12 @@ function App() {
     setSignatureResult(null);
     setVerificationResult(null);
     
-    if (!signerRef.current || !messageToSign.trim()) return;
-    
+    if (!signer || !messageToSign.trim()) return;
+
     setIsSigningMessage(true);
 
     try {
-      const response = await signerRef.current.signMessageDetailed(messageToSign);
+      const response = await signer.signMessageDetailed(messageToSign);
       setSignatureResult(response);
       setModalData({
         title: 'Message Signed!',
@@ -141,13 +153,13 @@ function App() {
   };
 
   const handleVerifySignature = async () => {
-    if (!signerRef.current || !signatureResult || !messageToSign) return;
-    
+    if (!signer || !signatureResult || !messageToSign) return;
+
     setIsVerifying(true);
     setVerificationResult(null);
 
     try {
-      const result = await signerRef.current.verifySignature(
+      const result = await signer.verifySignature(
         messageToSign,
         signatureResult.signature,
         signatureResult.owner
@@ -177,14 +189,18 @@ function App() {
   };
 
   useEffect(() => {
-    providerRef.current?.on('block', () => {
-      handleFetchData();
-    });
-
-    return () => {
-      providerRef.current?.removeListener('block', () => {});
+    if (!provider) return;
+    const listener = () => {
+      fetchDataWith(provider).catch((err) =>
+        setError(`Failed to refresh contract state. ${err}`)
+      );
     };
-  }, [providerRef.current]);
+    void provider.on('block', listener);
+    return () => {
+      // v6 Provider exposes `off`, not `removeListener`.
+      void provider.off('block', listener);
+    };
+  }, [provider]);
 
   return (
     <>
@@ -269,7 +285,7 @@ function App() {
                         <div>
                           <span className="text-sm text-gray-500">Last Setter:</span>
                           <span className="ml-2 text-gray-800 font-mono break-all">
-                            {ethers.utils.isAddress(lastSetter) ? formatAddress(lastSetter) : lastSetter}
+                            {isAddress(lastSetter) ? formatAddress(lastSetter) : lastSetter}
                           </span>
                         </div>
                       </div>

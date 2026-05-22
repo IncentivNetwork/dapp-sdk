@@ -1,7 +1,7 @@
 {
   "name": "incentiv-dapp-sdk-example",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@incentiv/dapp-sdk": "file:..",
-    "ethers": "^5.8.0",
+    "ethers": "^6.13.5",
     "buffer": "^6.0.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

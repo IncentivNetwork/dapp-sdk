@@ -1,8 +1,9 @@
 {
   "name": "@incentiv/dapp-sdk",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "Incentiv dApp SDK",
   "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "files": [
     "dist/src",
     "src",
@@ -10,7 +11,9 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "repository": {
     "type": "git",
@@ -23,9 +26,11 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.24",
-    "typescript": "^5.8.3"
+    "ethers": "^6.13.5",
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.7"
   },
   "peerDependencies": {
-    "ethers": "^5.0.0"
+    "ethers": "^6.13.0"
   }
 }

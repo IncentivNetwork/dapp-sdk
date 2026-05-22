@@ -2,7 +2,7 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "node",
-    "target": "es2017",
+    "target": "es2020",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
@@ -23,7 +23,8 @@
   "exclude": [
     "node_modules",
     "dist",
-    "example"
+    "example",
+    "tests"
   ]
 }
 
