@@ -1,6 +1,6 @@
 {
   "name": "@incentiv/dapp-sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Incentiv dApp SDK",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -10,7 +10,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc",
     "prepare": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest"
