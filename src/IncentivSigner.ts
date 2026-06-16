@@ -81,7 +81,7 @@ export interface IncentivTransactionResponse {
  * `new ethers.Interface(abi).encodeFunctionData(method, args)` and pass it to
  * `signer.sendTransaction({ to, data, value })`.
  */
-class IncentivSigner {
+export class IncentivSigner {
     public incentivResolver: IncentivResolver;
     public provider: Provider;
     public address: string;

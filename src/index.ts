@@ -1,5 +1,5 @@
 export {
-    default as IncentivSigner,
+    IncentivSigner,
     type IncentivSignerOptions,
     type IncentivTransactionResponse,
     type IncentivTransactionReceipt,
