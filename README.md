@@ -53,7 +53,7 @@ const Environment = {
   Portal: "https://portal.incentiv.io",
   RPC: "https://rpc.incentiv.io",
   EntryPoint: "0x3eC61c5633BBD7Afa9144C6610930489736a72d4",
-  VerifierContract: "0xd44EbfDf4FFf3e367b7e07e47eA0e70F5277Bca0",
+  VerifierContract: "0xa91429b7B42219b0D8b5C4052Bc8520e20Ea1b9c",
 };
 
 async function main () {
@@ -126,6 +126,8 @@ See `MIGRATION.md` for the full v5 → v6 cheat‑sheet.
 
 The SDK supports signing arbitrary messages through the Incentiv Portal and verifying those signatures on-chain. This is useful for authentication, proof of ownership, and other use cases where you need cryptographic proof without sending a transaction.
 
+> **Mainnet verifier address.** The current mainnet Verifier contract is `0xa91429b7B42219b0D8b5C4052Bc8520e20Ea1b9c`. It replaces `0xd44EbfDf4FFf3e367b7e07e47eA0e70F5277Bca0`: if your app passes the previous address as `verifierContract`, update your configuration. The SDK does not embed the address, so no SDK upgrade is needed.
+
 ### Signing Flow
 
 1. **`IncentivSigner.signMessageDetailed()`** → Opens Portal popup → Returns signature + owner data
@@ -141,7 +143,7 @@ const Environment = {
   Portal: "https://portal.incentiv.io",
   RPC: "https://rpc.incentiv.io",
   EntryPoint: "0x3eC61c5633BBD7Afa9144C6610930489736a72d4",
-  VerifierContract: "0xd44EbfDf4FFf3e367b7e07e47eA0e70F5277Bca0",
+  VerifierContract: "0xa91429b7B42219b0D8b5C4052Bc8520e20Ea1b9c",
 };
 
 async function signAndVerify() {
@@ -180,6 +182,8 @@ async function signAndVerify() {
 * **Verification**: The `verifySignature()` method calls the on-chain Verifier contract to validate that:
   - The signature is valid for the given message and owner
   - Returns the corresponding AA wallet address for that owner
+
+* **Handling the result**: With the current mainnet verifier (`0xa91429b7B42219b0D8b5C4052Bc8520e20Ea1b9c`), a signature that does not verify, including a malformed one, resolves to `{ isValid: false, accountAddress: "0x0000000000000000000000000000000000000000" }`, so always check `isValid` before trusting `accountAddress`. `verifySignature()` still throws when `owner` is not 20 or 64 bytes, when `owner` or `signature` is not valid hex (a string `message` is UTF-8 encoded, not hex-decoded), when the RPC call fails, or when no `verifierContract` was configured, so keep error handling around the call. Pass `signature` and `owner` from `signMessageDetailed()` through unchanged: the verifier expects the exact encoding the Portal returns.
 
 This allows you to prove that a user controls a specific AA wallet without requiring a transaction, which is perfect for authentication flows, session management, or any off-chain verification needs.
 
@@ -220,7 +224,7 @@ This allows you to prove that a user controls a specific AA wallet without requi
 | `sendBatchTransaction(calls: BatchCall[], options: BatchRequestOptions)` | Returns an `IncentivTransactionResponse` for batch transactions. Executes multiple calls in a single UserOperation with full `.wait()` support. |
 | `signMessage(message)`                                  | Opens the Portal popup to sign an arbitrary message. Returns the signature as a string concatenated with the owner data via a colon separator. For ease of use, prefer `signMessageDetailed()`.   |
 | `signMessageDetailed(message)`                          | Same as `signMessage()` but returns a `SignResponse` object containing the signature and owner data separately.                                 |
-| `verifySignature(message, signature, owner)`            | Verifies a signature on-chain using the Verifier contract. Returns `{ isValid: boolean, accountAddress: string }`. `accountAddress` is the address of the AA wallet owned by the message signer. Requires `verifierContract` to be set in the constructor. |
+| `verifySignature(message, signature, owner)`            | Verifies a signature on-chain using the Verifier contract. Returns `{ isValid: boolean, accountAddress: string }`. When `isValid` is `true`, `accountAddress` is the address of the AA wallet owned by the message signer; when it is `false`, `accountAddress` is the zero address. Requires `verifierContract` to be set in the constructor. |
 | `connect(provider)`                                     | Returns a new `IncentivSigner` instance bound to the given provider.                                                                      |
 | `setAccountAddress(address)`                            | Manually set / override the account address.                                                                                              |
 
