@@ -19,7 +19,7 @@ const Config = {
             RPC: "https://rpc.incentiv.io",
             Contract: "0xfDFA02EeAd0F32D44CeA4763fe72f1f26f1ABff4",
             EntryPoint: "0x3eC61c5633BBD7Afa9144C6610930489736a72d4",
-            VerifierContract: "0xd44EbfDf4FFf3e367b7e07e47eA0e70F5277Bca0",
+            VerifierContract: "0xa91429b7B42219b0D8b5C4052Bc8520e20Ea1b9c",
         }
     },
     ABI: [
